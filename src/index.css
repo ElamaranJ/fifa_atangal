@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #0f172a;
+    color: #1e293b;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+}
+
+/* Custom modern scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #1d6bf3;
+}
+
+/* Stadium background overlay utilities */
+.stadium-hero-bg {
+  background-image: linear-gradient(to bottom, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.45) 50%, rgba(16, 185, 129, 0.85) 90%, rgba(5, 150, 105, 0.95) 100%), url('/stadium_bg.jpg');
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
+}
+
+.turf-bg {
+  background-color: #059669;
+  background-image: 
+    radial-gradient(ellipse at center, rgba(16, 185, 129, 0.8) 0%, rgba(4, 120, 87, 0.95) 100%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 60px, transparent 60px, transparent 120px);
+}

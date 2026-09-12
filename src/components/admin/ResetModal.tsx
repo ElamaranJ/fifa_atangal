@@ -8,13 +8,14 @@ interface ResetModalProps {
 }
 
 export const ResetModal: React.FC<ResetModalProps> = ({ isOpen, onClose }) => {
-  const { resetTournament } = useTournament();
+  const { resetTournament, isAdmin } = useTournament();
   const [selectedMode, setSelectedMode] = useState<'RESULTS_ONLY' | 'FIXTURES_AND_RESULTS' | 'COMPLETE'>('RESULTS_ONLY');
   const [confirmStep, setConfirmStep] = useState(false);
 
-  if (!isOpen) return null;
+  if (!isOpen || !isAdmin) return null;
 
   const handleExecuteReset = () => {
+    if (!isAdmin) return;
     resetTournament(selectedMode);
     setConfirmStep(false);
     onClose();

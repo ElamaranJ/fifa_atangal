@@ -70,7 +70,7 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 ## ⚡ First-Time Seeding Behavior
 - On the **first-ever launch** when your Firestore database has no active tournament document, the application automatically seeds the initial tournament with registered players, fixtures, and standings.
 - Once seeded, any subsequent device that visits the site connects directly to the shared Firestore cloud document.
-- Default Admin PIN: **`admin123`** (can be changed in Admin settings).
+- Default Admin Password: **`rmdec@123`** (can be changed in Admin settings).
 
 ---
 

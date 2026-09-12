@@ -61,26 +61,26 @@ export const FixtureList: React.FC<FixtureListProps> = ({
   return (
     <div className="space-y-6">
       {/* Header & Filter Controls */}
-      <div className="bg-pitch-card/80 border border-pitch-border rounded-3xl p-5 sm:p-6 shadow-xl space-y-4">
+      <div className="bg-slate-950/45 backdrop-blur-xl border border-white/20 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4 text-white">
         
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h2 className="font-display text-2xl font-bold text-white tracking-wide">
+            <h2 className="font-display text-2xl font-black text-white tracking-wide">
               Tournament Fixtures
             </h2>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-300 font-medium">
               Showing {filteredMatches.length} of {matches.filter(m => m.stage === 'LEAGUE').length} League Matches
             </p>
           </div>
 
           {/* Status Segmented Buttons (Responsive full width on mobile) */}
-          <div className="flex items-center p-1 bg-pitch-darkest rounded-xl border border-pitch-border text-xs font-semibold w-full sm:w-auto">
+          <div className="flex items-center p-1 bg-white/10 backdrop-blur-md rounded-xl border border-white/15 text-xs font-semibold w-full sm:w-auto">
             <button
               onClick={() => setStatusFilter('ALL')}
               className={`flex-1 sm:flex-initial px-3 py-2 sm:py-1.5 rounded-lg transition-all min-h-[38px] flex items-center justify-center ${
                 statusFilter === 'ALL'
-                  ? 'bg-cyan-500 text-slate-950 font-bold shadow'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-[#1d6bf3] text-white font-bold shadow-blue-glow'
+                  : 'text-slate-300 hover:text-white'
               }`}
             >
               All Matches
@@ -89,8 +89,8 @@ export const FixtureList: React.FC<FixtureListProps> = ({
               onClick={() => setStatusFilter('UPCOMING')}
               className={`flex-1 sm:flex-initial px-3 py-2 sm:py-1.5 rounded-lg transition-all min-h-[38px] flex items-center justify-center ${
                 statusFilter === 'UPCOMING'
-                  ? 'bg-cyan-500 text-slate-950 font-bold shadow'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-[#1d6bf3] text-white font-bold shadow-blue-glow'
+                  : 'text-slate-300 hover:text-white'
               }`}
             >
               Upcoming
@@ -99,8 +99,8 @@ export const FixtureList: React.FC<FixtureListProps> = ({
               onClick={() => setStatusFilter('COMPLETED')}
               className={`flex-1 sm:flex-initial px-3 py-2 sm:py-1.5 rounded-lg transition-all min-h-[38px] flex items-center justify-center ${
                 statusFilter === 'COMPLETED'
-                  ? 'bg-cyan-500 text-slate-950 font-bold shadow'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-[#1d6bf3] text-white font-bold shadow-blue-glow'
+                  : 'text-slate-300 hover:text-white'
               }`}
             >
               Completed
@@ -109,7 +109,7 @@ export const FixtureList: React.FC<FixtureListProps> = ({
         </div>
 
         {/* Secondary Filter Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 pt-2 border-t border-pitch-border/60">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 pt-3 border-t border-white/10">
           
           {/* Search Player */}
           <div className="relative">
@@ -118,9 +118,9 @@ export const FixtureList: React.FC<FixtureListProps> = ({
               placeholder="Search by player name..."
               value={searchPlayer}
               onChange={(e) => setSearchPlayer(e.target.value)}
-              className="w-full pl-9 pr-3 py-2.5 sm:py-2 bg-pitch-darkest border border-pitch-border rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 min-h-[42px]"
+              className="w-full pl-9 pr-3 py-2.5 sm:py-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl text-xs text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 min-h-[42px]"
             />
-            <Search className="absolute left-3 top-3 sm:top-2.5 w-3.5 h-3.5 text-slate-500 pointer-events-none" />
+            <Search className="absolute left-3 top-3 sm:top-2.5 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
           </div>
 
           {/* Group Filter */}
@@ -129,12 +129,12 @@ export const FixtureList: React.FC<FixtureListProps> = ({
               <select
                 value={groupFilter}
                 onChange={(e) => setGroupFilter(e.target.value)}
-                className="w-full px-3 py-2.5 sm:py-2 bg-pitch-darkest border border-pitch-border rounded-xl text-xs text-white focus:outline-none focus:border-cyan-500 min-h-[42px]"
+                className="w-full px-3 py-2.5 sm:py-2 bg-slate-900/80 backdrop-blur-md border border-white/20 rounded-xl text-xs text-white focus:outline-none focus:ring-2 focus:ring-cyan-400/50 min-h-[42px]"
               >
-                <option value="ALL">All Groups</option>
-                <option value="Group A">Group A</option>
-                <option value="Group B">Group B</option>
-                <option value="Cross Group">Cross Group Matches</option>
+                <option value="ALL" className="bg-slate-900 text-white">All Groups</option>
+                <option value="Group A" className="bg-slate-900 text-white">Group A</option>
+                <option value="Group B" className="bg-slate-900 text-white">Group B</option>
+                <option value="Cross Group" className="bg-slate-900 text-white">Cross Group Matches</option>
               </select>
             </div>
           )}
@@ -144,11 +144,11 @@ export const FixtureList: React.FC<FixtureListProps> = ({
             <select
               value={roundFilter}
               onChange={(e) => setRoundFilter(e.target.value)}
-              className="w-full px-3 py-2.5 sm:py-2 bg-pitch-darkest border border-pitch-border rounded-xl text-xs text-white focus:outline-none focus:border-cyan-500 min-h-[42px]"
+              className="w-full px-3 py-2.5 sm:py-2 bg-slate-900/80 backdrop-blur-md border border-white/20 rounded-xl text-xs text-white focus:outline-none focus:ring-2 focus:ring-cyan-400/50 min-h-[42px]"
             >
-              <option value="ALL">All Rounds</option>
+              <option value="ALL" className="bg-slate-900 text-white">All Rounds</option>
               {rounds.map(r => (
-                <option key={r} value={r}>Round {r}</option>
+                <option key={r} value={r} className="bg-slate-900 text-white">Round {r}</option>
               ))}
             </select>
           </div>
@@ -158,10 +158,10 @@ export const FixtureList: React.FC<FixtureListProps> = ({
 
       {/* Fixture Grid */}
       {filteredMatches.length === 0 ? (
-        <div className="p-12 text-center bg-pitch-card/40 border border-pitch-border rounded-3xl">
-          <Calendar className="w-10 h-10 text-slate-600 mx-auto mb-2" />
-          <h3 className="text-sm font-bold text-slate-300">No matches found</h3>
-          <p className="text-xs text-slate-500 mt-1">Try resetting the filters or generate new fixtures.</p>
+        <div className="p-12 text-center bg-slate-950/45 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl text-white">
+          <Calendar className="w-10 h-10 text-cyan-400/70 mx-auto mb-2" />
+          <h3 className="text-sm font-bold text-white">No matches found</h3>
+          <p className="text-xs text-slate-300 mt-1">Try resetting the filters or generate new fixtures.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

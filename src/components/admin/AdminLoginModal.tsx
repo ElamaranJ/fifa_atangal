@@ -17,7 +17,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({ isOpen, onClos
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!pin.trim()) {
-      setError('Please enter admin PIN');
+      setError('Please enter admin password');
       return;
     }
     const ok = loginAdmin(pin.trim());
@@ -26,7 +26,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({ isOpen, onClos
       setPin('');
       onClose();
     } else {
-      setError('Incorrect PIN. Default is "admin123"');
+      setError('Incorrect password. Please try again.');
     }
   };
 
@@ -54,7 +54,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({ isOpen, onClos
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
-              Admin Passkey / PIN
+              Admin Password
             </label>
             <div className="relative">
               <input
@@ -64,16 +64,11 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({ isOpen, onClos
                   setPin(e.target.value);
                   setError('');
                 }}
-                placeholder="Enter admin PIN..."
+                placeholder="Enter admin password..."
                 autoFocus
                 className="w-full px-4 py-3 min-h-[44px] bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#1d6bf3] focus:ring-2 focus:ring-[#1d6bf3]/20 font-mono tracking-widest text-lg"
               />
               <Lock className="absolute right-3.5 top-3.5 w-5 h-5 text-slate-400 pointer-events-none" />
-            </div>
-            <div className="mt-2 flex items-center justify-between">
-              <span className="text-[11px] text-[#1d6bf3] font-medium">
-                Hint: Default PIN is <span className="font-bold underline">admin123</span>
-              </span>
             </div>
           </div>
 

@@ -1,6 +1,20 @@
 import { Tournament, Player, Match, PlayoffBracketData, PlayerStatistics } from '../types/tournament';
 import { generateFixtures } from '../services/fixtureGenerator';
 
+export const INITIAL_EMPTY_TOURNAMENT: Tournament = {
+  id: 'tour_attangal_championship',
+  tournament_name: 'eFootball Attangal Championship 2026',
+  status: 'SETUP',
+  group_format: 'SINGLE',
+  same_group_match_frequency: 1,
+  other_group_match_frequency: 0,
+  qualification_method: 'SINGLE_TOP_4',
+  win_points: 3,
+  draw_points: 1,
+  loss_points: 0,
+  created_at: new Date().toISOString(),
+};
+
 export const DEMO_TOURNAMENT_ID = 'tour_championship_2026';
 
 export const DEMO_TOURNAMENT: Tournament = {

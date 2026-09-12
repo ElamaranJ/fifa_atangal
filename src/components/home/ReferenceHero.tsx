@@ -64,7 +64,6 @@ export const ReferenceHero: React.FC = () => {
           </button>
         </div>
       </div>
-
     </div>
   );
 };

@@ -10,7 +10,7 @@ import {
 import { StorageService, DEFAULT_ADMIN_PIN, TournamentFirestoreDoc } from '../services/storage';
 import { recalculateTournamentState } from '../services/statsCalculator';
 import { generateFixtures } from '../services/fixtureGenerator';
-import { DEMO_TOURNAMENT, DEMO_PLAYERS, createDemoMatches, DEMO_PLAYOFFS } from '../data/demoTournament';
+import { INITIAL_EMPTY_TOURNAMENT, DEMO_TOURNAMENT_ID } from '../data/demoTournament';
 import { sounds } from '../services/soundEffects';
 
 interface TournamentContextType {
@@ -63,10 +63,10 @@ interface TournamentContextType {
 const TournamentContext = createContext<TournamentContextType | undefined>(undefined);
 
 export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [tournament, setTournament] = useState<Tournament>(DEMO_TOURNAMENT);
-  const [players, setPlayers] = useState<Player[]>(DEMO_PLAYERS);
-  const [matches, setMatches] = useState<Match[]>(createDemoMatches);
-  const [playoffs, setPlayoffs] = useState<PlayoffBracketData>(DEMO_PLAYOFFS);
+  const [tournament, setTournament] = useState<Tournament>(INITIAL_EMPTY_TOURNAMENT);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [playoffs, setPlayoffs] = useState<PlayoffBracketData>({});
   const [adminPin, setAdminPin] = useState<string>(DEFAULT_ADMIN_PIN);
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -90,21 +90,30 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const isRemoteSyncing = useRef(false);
   const hasInitialized = useRef(false);
 
-  // 1. Initial Firestore Setup & Real-time Subscription (Requirement 4 & 6)
+  // 1. Initial Firestore Setup & Real-time Subscription
   useEffect(() => {
     let isMounted = true;
 
     async function initFirestore() {
       try {
-        // Attempt initial seeding if Firestore has genuinely no data yet (first-ever load)
+        // Purge any legacy localStorage mock data
+        const localT = localStorage.getItem('fifa_tournament');
+        if (localT && (localT.includes(DEMO_TOURNAMENT_ID) || localT.includes('p_bharath'))) {
+          localStorage.removeItem('fifa_tournament');
+          localStorage.removeItem('fifa_players');
+          localStorage.removeItem('fifa_matches');
+          localStorage.removeItem('fifa_playoffs');
+        }
+
+        // Initialize empty tournament if document is empty
         await StorageService.seedInitialDataIfEmpty(
-          DEMO_TOURNAMENT,
-          DEMO_PLAYERS,
-          createDemoMatches(),
-          DEMO_PLAYOFFS
+          INITIAL_EMPTY_TOURNAMENT,
+          [],
+          [],
+          {}
         );
       } catch (err) {
-        console.error('[Storage] Seeding check failed:', err);
+        console.error('[Storage] Init check failed:', err);
       }
     }
 
@@ -116,6 +125,24 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         if (!isMounted) return;
 
         if (data) {
+          // Detect if remote Firestore contains legacy mock data; if so, wipe it
+          const isLegacyMock = data.tournament?.id === DEMO_TOURNAMENT_ID || data.players?.some(p => p.id === 'p_bharath');
+          if (isLegacyMock) {
+            console.log('[Storage] Found legacy mock data in Firestore. Auto-clearing to clean tournament...');
+            StorageService.clearAllData();
+            StorageService.saveTournament(INITIAL_EMPTY_TOURNAMENT);
+            StorageService.savePlayers([]);
+            StorageService.saveMatches([]);
+            StorageService.savePlayoffs({});
+            setTournament(INITIAL_EMPTY_TOURNAMENT);
+            setPlayers([]);
+            setMatches([]);
+            setPlayoffs({});
+            setIsLoading(false);
+            setSyncStatus('synced');
+            return;
+          }
+
           isRemoteSyncing.current = true;
           if (data.tournament) setTournament(data.tournament);
           if (Array.isArray(data.players)) setPlayers(data.players);
@@ -206,7 +233,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, []);
 
   const loginAdmin = useCallback((pin: string): boolean => {
-    if (pin === adminPin || pin === 'admin123') {
+    if (pin === adminPin || pin === DEFAULT_ADMIN_PIN || pin === 'rmdec@123') {
       setIsAdmin(true);
       StorageService.setAdminLoggedIn(true);
       return true;
@@ -217,13 +244,22 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const logoutAdmin = useCallback(() => {
     setIsAdmin(false);
     StorageService.setAdminLoggedIn(false);
+    setActiveTab(prev => (prev === 'admin' ? 'home' : prev));
   }, []);
 
   const updateTournament = useCallback((updates: Partial<Tournament>) => {
+    if (!isAdmin) {
+      console.warn('[Security] Unauthorized updateTournament attempt blocked');
+      return;
+    }
     setTournament(prev => ({ ...prev, ...updates }));
-  }, []);
+  }, [isAdmin]);
 
   const addPlayer = useCallback((name: string, photo?: string, group?: string) => {
+    if (!isAdmin) {
+      console.warn('[Security] Unauthorized addPlayer attempt blocked');
+      return;
+    }
     const newPlayer: Player = {
       id: `p_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       tournament_id: tournament.id,
@@ -233,19 +269,31 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       created_at: new Date().toISOString(),
     };
     setPlayers(prev => [...prev, newPlayer]);
-  }, [tournament.id, tournament.group_format]);
+  }, [isAdmin, tournament.id, tournament.group_format]);
 
   const updatePlayer = useCallback((id: string, updates: Partial<Player>) => {
+    if (!isAdmin) {
+      console.warn('[Security] Unauthorized updatePlayer attempt blocked');
+      return;
+    }
     setPlayers(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
-  }, []);
+  }, [isAdmin]);
 
   const removePlayer = useCallback((id: string) => {
+    if (!isAdmin) {
+      console.warn('[Security] Unauthorized removePlayer attempt blocked');
+      return;
+    }
     setPlayers(prev => prev.filter(p => p.id !== id));
-  }, []);
+  }, [isAdmin]);
 
   const setPlayersList = useCallback((newPlayers: Player[]) => {
+    if (!isAdmin) {
+      console.warn('[Security] Unauthorized setPlayersList attempt blocked');
+      return;
+    }
     setPlayers(newPlayers);
-  }, []);
+  }, [isAdmin]);
 
   // Update previous rank map before score changes to show rank shifts
   const updatePrevRanks = useCallback(() => {
@@ -258,6 +306,9 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     customTournament?: Tournament,
     customPlayers?: Player[]
   ): { success: boolean; error?: string } => {
+    if (!isAdmin) {
+      return { success: false, error: 'Admin login required to generate fixtures.' };
+    }
     const activeTournament = customTournament || tournament;
     const activePlayers = customPlayers || players;
 
@@ -289,7 +340,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setPlayoffs({});
     setTournament(prev => ({ ...prev, ...activeTournament, status: 'LEAGUE' }));
     return { success: true };
-  }, [players, tournament]);
+  }, [isAdmin, players, tournament]);
 
   const submitMatchResult = useCallback((
     matchId: string, 
@@ -298,6 +349,10 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     pens1?: number, 
     pens2?: number
   ) => {
+    if (!isAdmin) {
+      console.warn('[Security] Unauthorized submitMatchResult attempt blocked');
+      return;
+    }
     updatePrevRanks();
     sounds.playWhistle();
 
@@ -332,9 +387,13 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         completed_at: new Date().toISOString(),
       };
     }));
-  }, [updatePrevRanks]);
+  }, [isAdmin, updatePrevRanks]);
 
   const deleteMatchResult = useCallback((matchId: string) => {
+    if (!isAdmin) {
+      console.warn('[Security] Unauthorized deleteMatchResult attempt blocked');
+      return;
+    }
     updatePrevRanks();
     setMatches(prev => prev.map(m => {
       if (m.id !== matchId) return m;
@@ -350,7 +409,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         completed_at: undefined,
       };
     }));
-  }, [updatePrevRanks]);
+  }, [isAdmin, updatePrevRanks]);
 
   const updateMatchSchedule = useCallback((
     matchId: string, 
@@ -359,6 +418,10 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     location?: string, 
     status?: Match['status']
   ) => {
+    if (!isAdmin) {
+      console.warn('[Security] Unauthorized updateMatchSchedule attempt blocked');
+      return;
+    }
     setMatches(prev => prev.map(m => {
       if (m.id !== matchId) return m;
       return {
@@ -369,9 +432,12 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         status: status !== undefined ? status : m.status,
       };
     }));
-  }, []);
+  }, [isAdmin]);
 
   const startPlayoffs = useCallback((): { success: boolean; error?: string } => {
+    if (!isAdmin) {
+      return { success: false, error: 'Admin login required to start playoffs.' };
+    }
     const leagueMatches = matches.filter(m => m.stage === 'LEAGUE');
     const allDone = leagueMatches.length > 0 && leagueMatches.every(m => m.status === 'COMPLETED');
     if (!allDone) {
@@ -443,7 +509,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setTournament(prev => ({ ...prev, status: 'SEMI_FINALS' }));
     setActiveTab('playoffs');
     return { success: true };
-  }, [matches, tournament, overallStats, groupAStats, groupBStats, setActiveTab]);
+  }, [isAdmin, matches, tournament, overallStats, groupAStats, groupBStats, setActiveTab]);
 
   const submitPlayoffResult = useCallback((
     stage: 'SEMI_FINAL_1' | 'SEMI_FINAL_2' | 'FINAL' | 'THIRD_PLACE',
@@ -452,6 +518,10 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     p1Pens?: number,
     p2Pens?: number
   ) => {
+    if (!isAdmin) {
+      console.warn('[Security] Unauthorized submitPlayoffResult attempt blocked');
+      return;
+    }
     sounds.playWhistle();
 
     setPlayoffs(prev => {
@@ -558,9 +628,13 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
       return updated;
     });
-  }, [tournament.id]);
+  }, [isAdmin, tournament.id]);
 
   const resetTournament = useCallback((mode: 'RESULTS_ONLY' | 'FIXTURES_AND_RESULTS' | 'COMPLETE') => {
+    if (!isAdmin) {
+      console.warn('[Security] Unauthorized resetTournament attempt blocked');
+      return;
+    }
     if (mode === 'RESULTS_ONLY') {
       setMatches(prev => StorageService.resetResultsOnly(prev));
       setPlayoffs({});
@@ -572,31 +646,30 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     } else if (mode === 'COMPLETE') {
       StorageService.clearAllData();
       const freshTournament: Tournament = {
+        ...INITIAL_EMPTY_TOURNAMENT,
         id: `tour_${Date.now()}`,
-        tournament_name: 'New eFootball Championship',
-        status: 'SETUP',
-        group_format: 'SINGLE',
-        same_group_match_frequency: 1,
-        other_group_match_frequency: 0,
-        qualification_method: 'SINGLE_TOP_4',
-        win_points: 3,
-        draw_points: 1,
-        loss_points: 0,
         created_at: new Date().toISOString(),
       };
+      StorageService.saveTournament(freshTournament);
+      StorageService.savePlayers([]);
+      StorageService.saveMatches([]);
+      StorageService.savePlayoffs({});
       setTournament(freshTournament);
       setPlayers([]);
       setMatches([]);
       setPlayoffs({});
       setActiveTab('admin');
     }
-  }, [setActiveTab]);
+  }, [isAdmin, setActiveTab]);
 
   const exportTournamentData = useCallback((): string => {
     return StorageService.exportBackup(tournament, players, matches, playoffs);
   }, [tournament, players, matches, playoffs]);
 
   const importTournamentData = useCallback((jsonStr: string): { success: boolean; error?: string } => {
+    if (!isAdmin) {
+      return { success: false, error: 'Admin login required to import tournament data.' };
+    }
     const res = StorageService.validateAndParseBackup(jsonStr);
     if (!res.isValid || !res.backup) {
       return { success: false, error: res.error || 'Invalid backup structure' };
@@ -608,7 +681,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setPlayoffs(b.playoffs || {});
     setActiveTab('home');
     return { success: true };
-  }, [setActiveTab]);
+  }, [isAdmin, setActiveTab]);
 
   return (
     <TournamentContext.Provider

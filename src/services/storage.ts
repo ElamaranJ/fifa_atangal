@@ -36,7 +36,7 @@ const STORAGE_KEYS = {
   ADMIN_AUTH: 'efootball_admin_logged_in',
 };
 
-export const DEFAULT_ADMIN_PIN = 'admin123';
+export const DEFAULT_ADMIN_PIN = 'rmdec@123';
 
 /**
  * Compresses an image file using an offscreen canvas to maximum dimensions (256x256)
@@ -321,7 +321,11 @@ export const StorageService = {
         // fallback
       }
     }
-    return localStorage.getItem(STORAGE_KEYS.ADMIN_PIN) || DEFAULT_ADMIN_PIN;
+    const saved = localStorage.getItem(STORAGE_KEYS.ADMIN_PIN);
+    if (!saved || saved === 'admin123') {
+      return DEFAULT_ADMIN_PIN;
+    }
+    return saved;
   },
 
   async setAdminPin(pin: string): Promise<void> {

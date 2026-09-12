@@ -11,7 +11,7 @@ interface ScoreEntryModalProps {
 }
 
 export const ScoreEntryModal: React.FC<ScoreEntryModalProps> = ({ match, isOpen, onClose }) => {
-  const { players, submitMatchResult, deleteMatchResult, submitPlayoffResult } = useTournament();
+  const { players, submitMatchResult, deleteMatchResult, submitPlayoffResult, isAdmin } = useTournament();
 
   const [s1, setS1] = useState<number>(0);
   const [s2, setS2] = useState<number>(0);
@@ -34,7 +34,7 @@ export const ScoreEntryModal: React.FC<ScoreEntryModalProps> = ({ match, isOpen,
     }
   }, [match]);
 
-  if (!isOpen || !match) return null;
+  if (!isOpen || !match || !isAdmin) return null;
 
   const isPlayoffMatch = match.stage !== 'LEAGUE';
   const isDrawn = s1 === s2;

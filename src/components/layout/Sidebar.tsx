@@ -11,15 +11,17 @@ import {
   Zap,
   Lock,
   Unlock,
-  X
+  X,
+  RotateCcw
 } from 'lucide-react';
 
 interface SidebarProps {
   onOpenAdminLogin: () => void;
+  onOpenResetModal?: () => void;
   onNavigate?: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ onOpenAdminLogin, onNavigate }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ onOpenAdminLogin, onOpenResetModal, onNavigate }) => {
   const { activeTab, setActiveTab, isAdmin, logoutAdmin } = useTournament();
 
   const handleSelectTab = (tabId: string) => {
@@ -120,18 +122,50 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenAdminLogin, onNavigate }
             <div className="h-[1px] bg-slate-200/80 mx-2" />
           </div>
 
-          {/* Admin Dashboard link */}
+          {/* Admin Dashboard link (Password protected) */}
           <button
-            onClick={() => handleSelectTab('admin')}
-            className={`w-full flex items-center gap-3.5 px-4 py-3 sm:py-2.5 rounded-xl font-medium text-sm transition-all group min-h-[44px] ${
-              activeTab === 'admin'
+            onClick={() => {
+              if (!isAdmin) {
+                onNavigate?.();
+                onOpenAdminLogin();
+              } else {
+                handleSelectTab('admin');
+              }
+            }}
+            className={`w-full flex items-center justify-between px-4 py-3 sm:py-2.5 rounded-xl font-medium text-sm transition-all group min-h-[44px] ${
+              isAdmin && activeTab === 'admin'
                 ? 'bg-[#1d6bf3] text-white font-bold shadow-blue-glow'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
             }`}
           >
-            <Settings className={`w-4 h-4 ${activeTab === 'admin' ? 'text-white' : 'text-slate-500 group-hover:text-slate-700'}`} />
-            <span>Admin Dashboard</span>
+            <div className="flex items-center gap-3.5 min-w-0">
+              {isAdmin ? (
+                <Settings className={`w-4 h-4 ${activeTab === 'admin' ? 'text-white' : 'text-slate-500 group-hover:text-slate-700'}`} />
+              ) : (
+                <Lock className="w-4 h-4 text-amber-500" />
+              )}
+              <span className="truncate">{isAdmin ? 'Admin Dashboard' : 'Admin Login'}</span>
+            </div>
+            {!isAdmin && (
+              <span className="text-[10px] font-bold font-mono px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                PIN
+              </span>
+            )}
           </button>
+
+          {/* Reset Tournament for Admin */}
+          {isAdmin && (
+            <button
+              onClick={() => {
+                onNavigate?.();
+                onOpenResetModal?.();
+              }}
+              className="w-full flex items-center gap-3.5 px-4 py-3 sm:py-2.5 rounded-xl font-medium text-sm transition-all group min-h-[44px] text-rose-600 hover:text-rose-700 hover:bg-rose-50/80 mt-1"
+            >
+              <RotateCcw className="w-4 h-4 text-rose-500" />
+              <span>Reset Tournament</span>
+            </button>
+          )}
         </nav>
       </div>
 

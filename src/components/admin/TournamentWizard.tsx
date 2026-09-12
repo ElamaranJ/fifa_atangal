@@ -33,8 +33,13 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
     setPlayersList, 
     generateTournamentFixtures, 
     startPlayoffs, 
-    setActiveTab 
+    setActiveTab,
+    isAdmin,
   } = useTournament();
+
+  if (!isAdmin) {
+    return null;
+  }
 
   const [activeStep, setActiveStep] = useState<number>(1);
   const [numPlayersInput, setNumPlayersInput] = useState<number>(players.length || 8);
@@ -195,28 +200,30 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
     <div className="space-y-6">
       
       {/* Top Banner */}
-      <div className="bg-pitch-card/80 border border-pitch-border rounded-3xl p-5 sm:p-6 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white/95 backdrop-blur-md border border-white/80 rounded-3xl p-5 sm:p-6 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="font-display text-2xl sm:text-3xl font-bold text-white flex items-center gap-2.5">
-            <Settings className="w-6 h-6 text-cyan-400" />
+          <h2 className="font-display text-2xl sm:text-3xl font-black text-slate-900 flex items-center gap-2.5">
+            <Settings className="w-6 h-6 text-[#1d6bf3]" />
             <span>Admin Tournament Setup Wizard</span>
           </h2>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-500 mt-1 font-medium">
             Configure player rosters, flexible round frequencies, group splits, and automated fixture schedules
           </p>
         </div>
 
-        <button
-          onClick={onOpenResetModal}
-          className="px-4 py-2 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/40 text-rose-300 text-xs font-bold flex items-center gap-1.5 transition-colors self-start md:self-auto"
-        >
-          <RotateCcw className="w-3.5 h-3.5" />
-          <span>Reset Options</span>
-        </button>
+        {isAdmin && (
+          <button
+            onClick={onOpenResetModal}
+            className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold flex items-center gap-2 shadow-md transition-all self-start md:self-auto active:scale-95 border-0"
+          >
+            <RotateCcw className="w-4 h-4 text-white" />
+            <span>Reset Tournament</span>
+          </button>
+        )}
       </div>
 
       {/* Step Navigator */}
-      <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto touch-pan-x [-webkit-overflow-scrolling:touch] bg-pitch-card border border-pitch-border rounded-2xl p-2 sm:p-3 shadow-md">
+      <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto touch-pan-x [-webkit-overflow-scrolling:touch] bg-white/90 backdrop-blur-md border border-white/80 rounded-2xl p-2 sm:p-3 shadow-sm">
         {steps.map((stg) => {
           const Icon = stg.icon;
           const isActive = activeStep === stg.num;
@@ -228,14 +235,14 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
               onClick={() => setActiveStep(stg.num)}
               className={`flex items-center gap-2 px-3 py-2.5 sm:py-2 min-h-[42px] rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
                 isActive
-                  ? 'bg-cyan-500 text-slate-950 shadow-glow-cyan'
+                  ? 'bg-[#1d6bf3] text-white shadow-md'
                   : isDone
-                  ? 'text-emerald-400 hover:bg-pitch-panel'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100/60'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
               }`}
             >
               <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                isActive ? 'bg-slate-950 text-cyan-400' : isDone ? 'bg-emerald-500/20 text-emerald-400' : 'bg-pitch-panel'
+                isActive ? 'bg-white text-[#1d6bf3]' : isDone ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'
               }`}>
                 {isDone ? '✓' : stg.num}
               </div>
@@ -249,22 +256,22 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
       {statusAlert && (
         <div className={`p-4 rounded-2xl border text-xs flex items-center gap-2 ${
           statusAlert.type === 'success'
-            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-            : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+            ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+            : 'bg-rose-50 border-rose-200 text-rose-800'
         }`}>
-          {statusAlert.type === 'success' ? <Check className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
-          <span>{statusAlert.text}</span>
+          {statusAlert.type === 'success' ? <Check className="w-4 h-4 text-emerald-600" /> : <AlertTriangle className="w-4 h-4 text-rose-600" />}
+          <span className="font-semibold">{statusAlert.text}</span>
         </div>
       )}
 
       {/* Step 1: Tournament Info & Points */}
       {activeStep === 1 && (
-        <div className="bg-pitch-card/90 border border-pitch-border rounded-3xl p-6 sm:p-8 shadow-xl space-y-6 animate-in fade-in">
-          <h3 className="font-display text-xl font-bold text-white">Step 1: Tournament Information & Points Rule</h3>
+        <div className="bg-white/95 backdrop-blur-md border border-white/80 rounded-3xl p-6 sm:p-8 shadow-md space-y-6 animate-in fade-in">
+          <h3 className="font-display text-xl font-black text-slate-900">Step 1: Tournament Information & Points Rule</h3>
 
           <div className="space-y-4 max-w-xl">
             <div>
-              <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block mb-1.5">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
                 Tournament Name
               </label>
               <input
@@ -272,46 +279,46 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
                 value={tournamentName}
                 onChange={(e) => setTournamentName(e.target.value)}
                 placeholder="e.g. eFootball Attangal Championship 2026"
-                className="w-full px-4 py-3 bg-pitch-darkest border border-pitch-border rounded-xl text-white text-sm font-semibold focus:outline-none focus:border-cyan-500"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#1d6bf3]/30 focus:border-[#1d6bf3] placeholder-slate-400"
               />
             </div>
 
             <div className="pt-2">
-              <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block mb-3">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-3">
                 Points System (Default: 3 for Win, 1 for Draw, 0 for Loss)
               </label>
               <div className="grid grid-cols-3 gap-3">
-                <div className="bg-pitch-darkest p-3 rounded-xl border border-pitch-border">
-                  <span className="text-[10px] text-slate-400 uppercase block font-mono">Win Points</span>
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  <span className="text-[10px] text-slate-500 uppercase block font-mono font-bold">Win Points</span>
                   <input
                     type="number"
                     min="1"
                     max="10"
                     value={winPoints}
                     onChange={(e) => setWinPoints(parseInt(e.target.value) || 3)}
-                    className="w-full mt-1 bg-pitch-panel px-3 py-1.5 rounded-lg text-white font-display font-bold text-center"
+                    className="w-full mt-1 bg-white border border-slate-300 px-3 py-1.5 rounded-lg text-slate-900 font-display font-bold text-center focus:ring-2 focus:ring-[#1d6bf3]/30 focus:outline-none"
                   />
                 </div>
-                <div className="bg-pitch-darkest p-3 rounded-xl border border-pitch-border">
-                  <span className="text-[10px] text-slate-400 uppercase block font-mono">Draw Points</span>
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  <span className="text-[10px] text-slate-500 uppercase block font-mono font-bold">Draw Points</span>
                   <input
                     type="number"
                     min="0"
                     max="10"
                     value={drawPoints}
                     onChange={(e) => setDrawPoints(parseInt(e.target.value) || 1)}
-                    className="w-full mt-1 bg-pitch-panel px-3 py-1.5 rounded-lg text-white font-display font-bold text-center"
+                    className="w-full mt-1 bg-white border border-slate-300 px-3 py-1.5 rounded-lg text-slate-900 font-display font-bold text-center focus:ring-2 focus:ring-[#1d6bf3]/30 focus:outline-none"
                   />
                 </div>
-                <div className="bg-pitch-darkest p-3 rounded-xl border border-pitch-border">
-                  <span className="text-[10px] text-slate-400 uppercase block font-mono">Loss Points</span>
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  <span className="text-[10px] text-slate-500 uppercase block font-mono font-bold">Loss Points</span>
                   <input
                     type="number"
                     min="0"
                     max="10"
                     value={lossPoints}
                     onChange={(e) => setLossPoints(parseInt(e.target.value) || 0)}
-                    className="w-full mt-1 bg-pitch-panel px-3 py-1.5 rounded-lg text-white font-display font-bold text-center"
+                    className="w-full mt-1 bg-white border border-slate-300 px-3 py-1.5 rounded-lg text-slate-900 font-display font-bold text-center focus:ring-2 focus:ring-[#1d6bf3]/30 focus:outline-none"
                   />
                 </div>
               </div>
@@ -321,7 +328,7 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
           <div className="pt-4 flex justify-end">
             <button
               onClick={() => setActiveStep(2)}
-              className="px-6 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-sm flex items-center gap-2 shadow-glow-cyan"
+              className="px-6 py-2.5 rounded-xl bg-[#1d6bf3] hover:bg-[#1557c0] text-white font-bold text-sm flex items-center gap-2 shadow-md transition-all hover:scale-105 active:scale-95"
             >
               <span>Next: Player Registration</span>
               <ArrowRight className="w-4 h-4" />
@@ -332,29 +339,29 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
 
       {/* Step 2: Dynamic Player Registration & Photo Upload */}
       {activeStep === 2 && (
-        <div className="bg-pitch-card/90 border border-pitch-border rounded-3xl p-6 sm:p-8 shadow-xl space-y-6 animate-in fade-in">
+        <div className="bg-white/95 backdrop-blur-md border border-white/80 rounded-3xl p-6 sm:p-8 shadow-md space-y-6 animate-in fade-in">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h3 className="font-display text-xl font-bold text-white">Step 2: Player Registration</h3>
-              <p className="text-xs text-slate-400">
+              <h3 className="font-display text-xl font-black text-slate-900">Step 2: Player Registration</h3>
+              <p className="text-xs text-slate-500 font-medium">
                 Enter number of competitors and customize names and optional profile pictures
               </p>
             </div>
 
             {/* Dynamic Player Count Selector */}
-            <div className="flex items-center gap-2 bg-pitch-darkest p-2 rounded-2xl border border-pitch-border">
-              <span className="text-xs font-semibold text-slate-300">Total Players:</span>
+            <div className="flex items-center gap-2 bg-slate-100 p-2 rounded-2xl border border-slate-200">
+              <span className="text-xs font-bold text-slate-700">Total Players:</span>
               <input
                 type="number"
                 min="2"
                 max="64"
                 value={numPlayersInput}
                 onChange={(e) => handleGeneratePlayerInputs(parseInt(e.target.value) || 2)}
-                className="w-16 px-2 py-1 text-center font-display font-bold text-sm bg-pitch-panel border border-pitch-border rounded-lg text-cyan-300"
+                className="w-16 px-2 py-1 text-center font-display font-bold text-sm bg-white border border-slate-300 rounded-lg text-[#1d6bf3] focus:outline-none focus:ring-2 focus:ring-[#1d6bf3]/30"
               />
               <button
                 onClick={() => handleGeneratePlayerInputs(numPlayersInput)}
-                className="px-3 py-1 bg-cyan-500 text-slate-950 text-xs font-bold rounded-lg hover:bg-cyan-400"
+                className="px-3 py-1 bg-[#1d6bf3] text-white text-xs font-bold rounded-lg hover:bg-[#1557c0] transition-colors"
               >
                 Apply
               </button>
@@ -366,9 +373,9 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
             {wizardPlayers.map((player, idx) => (
               <div
                 key={player.id}
-                className="flex items-center gap-3 p-3 bg-pitch-darkest/70 border border-pitch-border rounded-2xl"
+                className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-2xl shadow-xs"
               >
-                <span className="w-6 text-center font-mono text-xs font-bold text-slate-500">
+                <span className="w-6 text-center font-mono text-xs font-bold text-slate-400">
                   #{idx + 1}
                 </span>
 
@@ -388,7 +395,7 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
                     title="Upload / Change Photo"
                     className="absolute inset-0 rounded-full bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer"
                   >
-                    <Upload className="w-3.5 h-3.5 text-cyan-300" />
+                    <Upload className="w-3.5 h-3.5 text-white" />
                   </button>
                 </div>
 
@@ -397,14 +404,14 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
                   value={player.player_name}
                   onChange={(e) => handleUpdatePlayerName(player.id, e.target.value)}
                   placeholder={`Player ${idx + 1} name...`}
-                  className="flex-1 px-3 py-2 bg-pitch-panel border border-pitch-border rounded-xl text-xs font-bold text-white focus:outline-none focus:border-cyan-500"
+                  className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1d6bf3]/30 focus:border-[#1d6bf3]"
                 />
 
                 {player.player_photo && (
                   <button
                     onClick={() => setWizardPlayers(prev => prev.map(p => p.id === player.id ? { ...p, player_photo: undefined } : p))}
                     title="Remove Photo"
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 text-xs"
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 text-xs"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -421,16 +428,16 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
             className="hidden"
           />
 
-          <div className="pt-4 flex items-center justify-between border-t border-pitch-border">
+          <div className="pt-4 flex items-center justify-between border-t border-slate-200">
             <button
               onClick={() => setActiveStep(1)}
-              className="px-5 py-2.5 rounded-xl border border-pitch-border text-slate-300 hover:bg-pitch-panel text-sm font-semibold"
+              className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-sm font-semibold transition-colors"
             >
               Back
             </button>
             <button
               onClick={() => setActiveStep(3)}
-              className="px-6 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-sm flex items-center gap-2 shadow-glow-cyan"
+              className="px-6 py-2.5 rounded-xl bg-[#1d6bf3] hover:bg-[#1557c0] text-white font-bold text-sm flex items-center gap-2 shadow-md transition-all hover:scale-105 active:scale-95"
             >
               <span>Next: Group Format</span>
               <ArrowRight className="w-4 h-4" />
@@ -441,9 +448,9 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
 
       {/* Step 3: Group Format Selection & Division */}
       {activeStep === 3 && (
-        <div className="bg-pitch-card/90 border border-pitch-border rounded-3xl p-6 sm:p-8 shadow-xl space-y-6 animate-in fade-in">
-          <h3 className="font-display text-xl font-bold text-white">Step 3: Tournament Group Organization</h3>
-          <p className="text-xs text-slate-400">
+        <div className="bg-white/95 backdrop-blur-md border border-white/80 rounded-3xl p-6 sm:p-8 shadow-md space-y-6 animate-in fade-in">
+          <h3 className="font-display text-xl font-black text-slate-900">Step 3: Tournament Group Organization</h3>
+          <p className="text-xs text-slate-500 font-medium">
             Choose whether all competitors compete in a single league, or split into two groups (Group A & Group B).
           </p>
 
@@ -452,15 +459,15 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
               onClick={() => setGroupFormat('SINGLE')}
               className={`p-5 rounded-2xl border-2 cursor-pointer transition-all ${
                 groupFormat === 'SINGLE'
-                  ? 'border-cyan-500 bg-cyan-500/10 shadow-glow-cyan'
-                  : 'border-pitch-border bg-pitch-darkest hover:border-slate-500'
+                  ? 'border-[#1d6bf3] bg-blue-50/70 shadow-sm'
+                  : 'border-slate-200 bg-slate-50/70 hover:border-slate-300'
               }`}
             >
               <div className="flex items-center justify-between mb-2">
-                <h4 className="font-bold text-white">All Players in One Group</h4>
-                <div className={`w-4 h-4 rounded-full border-2 ${groupFormat === 'SINGLE' ? 'bg-cyan-400 border-cyan-400' : 'border-slate-500'}`} />
+                <h4 className="font-bold text-slate-900">All Players in One Group</h4>
+                <div className={`w-4 h-4 rounded-full border-2 ${groupFormat === 'SINGLE' ? 'bg-[#1d6bf3] border-[#1d6bf3]' : 'border-slate-300'}`} />
               </div>
-              <p className="text-xs text-slate-300">
+              <p className="text-xs text-slate-600">
                 Single league table where every player competes against everyone else based on the match frequency.
               </p>
             </div>
@@ -472,15 +479,15 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
               }}
               className={`p-5 rounded-2xl border-2 cursor-pointer transition-all ${
                 groupFormat === 'TWO_GROUPS'
-                  ? 'border-cyan-500 bg-cyan-500/10 shadow-glow-cyan'
-                  : 'border-pitch-border bg-pitch-darkest hover:border-slate-500'
+                  ? 'border-[#1d6bf3] bg-blue-50/70 shadow-sm'
+                  : 'border-slate-200 bg-slate-50/70 hover:border-slate-300'
               }`}
             >
               <div className="flex items-center justify-between mb-2">
-                <h4 className="font-bold text-white">Divide Players into Two Groups</h4>
-                <div className={`w-4 h-4 rounded-full border-2 ${groupFormat === 'TWO_GROUPS' ? 'bg-cyan-400 border-cyan-400' : 'border-slate-500'}`} />
+                <h4 className="font-bold text-slate-900">Divide Players into Two Groups</h4>
+                <div className={`w-4 h-4 rounded-full border-2 ${groupFormat === 'TWO_GROUPS' ? 'bg-[#1d6bf3] border-[#1d6bf3]' : 'border-slate-300'}`} />
               </div>
-              <p className="text-xs text-slate-300">
+              <p className="text-xs text-slate-600">
                 Splits competitors into Group A & Group B. Supports automatic or manual drag/click assignment.
               </p>
             </div>
@@ -488,14 +495,14 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
 
           {/* If Two Groups selected: Show Group Assignment buckets */}
           {groupFormat === 'TWO_GROUPS' && (
-            <div className="space-y-4 pt-4 border-t border-pitch-border">
+            <div className="space-y-4 pt-4 border-t border-slate-200">
               <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                   Group Assignment (Click any player tag to switch groups)
                 </h4>
                 <button
                   onClick={handleAutoDivideGroups}
-                  className="text-xs text-cyan-400 hover:text-cyan-300 font-bold flex items-center gap-1"
+                  className="text-xs text-[#1d6bf3] hover:text-[#1557c0] font-bold flex items-center gap-1"
                 >
                   <Shuffle className="w-3.5 h-3.5" /> Auto Balance Groups
                 </button>
@@ -503,50 +510,50 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Group A Box */}
-                <div className="p-4 bg-pitch-darkest/90 border border-pitch-border rounded-2xl">
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl">
                   <div className="flex items-center justify-between mb-3">
-                    <span className="font-display font-bold text-sm text-cyan-400 uppercase">
+                    <span className="font-display font-bold text-sm text-cyan-700 uppercase">
                       Group A ({groupACount} Players)
                     </span>
-                    <span className="text-[10px] text-slate-500 font-mono">Seed 1</span>
+                    <span className="text-[10px] text-slate-400 font-mono">Seed 1</span>
                   </div>
                   <div className="space-y-2 max-h-60 overflow-y-auto">
                     {wizardPlayers.filter(p => p.group_name === 'Group A').map(p => (
                       <div
                         key={p.id}
                         onClick={() => handleToggleGroup(p.id)}
-                        className="flex items-center justify-between p-2 rounded-xl bg-pitch-panel border border-pitch-border hover:border-cyan-500/50 cursor-pointer text-xs"
+                        className="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200 hover:border-cyan-500/50 cursor-pointer text-xs shadow-xs"
                       >
                         <div className="flex items-center gap-2">
                           <PlayerAvatar name={p.player_name} photo={p.player_photo} size="xs" />
-                          <span className="font-bold text-white">{p.player_name}</span>
+                          <span className="font-bold text-slate-800">{p.player_name}</span>
                         </div>
-                        <span className="text-[10px] font-mono text-cyan-300">Move to B →</span>
+                        <span className="text-[10px] font-mono text-cyan-600 font-semibold">Move to B →</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
                 {/* Group B Box */}
-                <div className="p-4 bg-pitch-darkest/90 border border-pitch-border rounded-2xl">
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl">
                   <div className="flex items-center justify-between mb-3">
-                    <span className="font-display font-bold text-sm text-emerald-400 uppercase">
+                    <span className="font-display font-bold text-sm text-emerald-700 uppercase">
                       Group B ({groupBCount} Players)
                     </span>
-                    <span className="text-[10px] text-slate-500 font-mono">Seed 2</span>
+                    <span className="text-[10px] text-slate-400 font-mono">Seed 2</span>
                   </div>
                   <div className="space-y-2 max-h-60 overflow-y-auto">
                     {wizardPlayers.filter(p => p.group_name === 'Group B').map(p => (
                       <div
                         key={p.id}
                         onClick={() => handleToggleGroup(p.id)}
-                        className="flex items-center justify-between p-2 rounded-xl bg-pitch-panel border border-pitch-border hover:border-emerald-500/50 cursor-pointer text-xs"
+                        className="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200 hover:border-emerald-500/50 cursor-pointer text-xs shadow-xs"
                       >
                         <div className="flex items-center gap-2">
                           <PlayerAvatar name={p.player_name} photo={p.player_photo} size="xs" />
-                          <span className="font-bold text-white">{p.player_name}</span>
+                          <span className="font-bold text-slate-800">{p.player_name}</span>
                         </div>
-                        <span className="text-[10px] font-mono text-emerald-300">← Move to A</span>
+                        <span className="text-[10px] font-mono text-emerald-600 font-semibold">← Move to A</span>
                       </div>
                     ))}
                   </div>
@@ -555,16 +562,16 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
             </div>
           )}
 
-          <div className="pt-4 flex items-center justify-between border-t border-pitch-border">
+          <div className="pt-4 flex items-center justify-between border-t border-slate-200">
             <button
               onClick={() => setActiveStep(2)}
-              className="px-5 py-2.5 rounded-xl border border-pitch-border text-slate-300 hover:bg-pitch-panel text-sm font-semibold"
+              className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-sm font-semibold transition-colors"
             >
               Back
             </button>
             <button
               onClick={() => setActiveStep(4)}
-              className="px-6 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-sm flex items-center gap-2 shadow-glow-cyan"
+              className="px-6 py-2.5 rounded-xl bg-[#1d6bf3] hover:bg-[#1557c0] text-white font-bold text-sm flex items-center gap-2 shadow-md transition-all hover:scale-105 active:scale-95"
             >
               <span>Next: Match Frequency</span>
               <ArrowRight className="w-4 h-4" />
@@ -575,16 +582,16 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
 
       {/* Step 4: Flexible Match Frequency Configuration */}
       {activeStep === 4 && (
-        <div className="bg-pitch-card/90 border border-pitch-border rounded-3xl p-6 sm:p-8 shadow-xl space-y-6 animate-in fade-in">
-          <h3 className="font-display text-xl font-bold text-white">Step 4: Flexible Match Frequency Configuration</h3>
-          <p className="text-xs text-slate-400">
+        <div className="bg-white/95 backdrop-blur-md border border-white/80 rounded-3xl p-6 sm:p-8 shadow-md space-y-6 animate-in fade-in">
+          <h3 className="font-display text-xl font-black text-slate-900">Step 4: Flexible Match Frequency Configuration</h3>
+          <p className="text-xs text-slate-500 font-medium">
             Define how many times opponents face each other. The system will calculate and preview the exact fixture numbers.
           </p>
 
           {groupFormat === 'SINGLE' ? (
             <div className="max-w-xl space-y-4">
               <div>
-                <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block mb-2">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-2">
                   Matches Per Opponent (Single / Double / Custom Round Robin)
                 </label>
                 <div className="grid grid-cols-4 gap-2">
@@ -595,8 +602,8 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
                       onClick={() => setSameGroupFreq(freq)}
                       className={`py-3 rounded-xl border font-display font-bold text-sm transition-all ${
                         sameGroupFreq === freq
-                          ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-glow-cyan'
-                          : 'bg-pitch-darkest text-slate-300 border-pitch-border hover:bg-pitch-panel'
+                          ? 'bg-[#1d6bf3] text-white border-[#1d6bf3] shadow-md'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                       }`}
                     >
                       {freq === 1 ? '1 Match (Single)' : freq === 2 ? '2 Matches (Double)' : `${freq} Matches`}
@@ -608,13 +615,13 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div>
-                <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block mb-2">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-2">
                   Same Group Matches Per Opponent
                 </label>
                 <select
                   value={sameGroupFreq}
                   onChange={(e) => setSameGroupFreq(parseInt(e.target.value) || 0)}
-                  className="w-full px-4 py-3 bg-pitch-darkest border border-pitch-border rounded-xl text-white font-bold text-sm focus:outline-none focus:border-cyan-500"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold text-sm focus:outline-none focus:ring-2 focus:ring-[#1d6bf3]/30 focus:border-[#1d6bf3]"
                 >
                   <option value={0}>0 Matches (No intra-group)</option>
                   <option value={1}>1 Match (Single Round Robin)</option>
@@ -625,13 +632,13 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block mb-2">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-2">
                   Cross Group Matches Per Opponent
                 </label>
                 <select
                   value={otherGroupFreq}
                   onChange={(e) => setOtherGroupFreq(parseInt(e.target.value) || 0)}
-                  className="w-full px-4 py-3 bg-pitch-darkest border border-pitch-border rounded-xl text-white font-bold text-sm focus:outline-none focus:border-cyan-500"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold text-sm focus:outline-none focus:ring-2 focus:ring-[#1d6bf3]/30 focus:border-[#1d6bf3]"
                 >
                   <option value={0}>0 Matches (No cross-group)</option>
                   <option value={1}>1 Match against each other group team</option>
@@ -643,44 +650,44 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
           )}
 
           {/* Mathematical Verification Card */}
-          <div className="p-5 bg-pitch-darkest/90 border border-pitch-border rounded-2xl space-y-2">
-            <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider block">
+          <div className="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+            <span className="text-xs font-bold text-[#1d6bf3] uppercase tracking-wider block">
               📊 Live Fixture Mathematics Preview
             </span>
             <div className="grid grid-cols-3 gap-3 pt-2 text-center">
-              <div className="p-3 bg-pitch-panel/60 rounded-xl border border-pitch-border">
-                <span className="text-[10px] text-slate-400 block font-mono">Matches / Player</span>
-                <span className="text-xl font-display font-bold text-white">
+              <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs">
+                <span className="text-[10px] text-slate-500 block font-mono font-bold">Matches / Player</span>
+                <span className="text-xl font-display font-bold text-slate-900">
                   {groupFormat === 'SINGLE' 
                     ? (wizardPlayers.length - 1) * sameGroupFreq 
                     : `${(Math.max(0, groupACount - 1)) * sameGroupFreq + (groupBCount * otherGroupFreq)} (avg)`}
                 </span>
               </div>
-              <div className="p-3 bg-pitch-panel/60 rounded-xl border border-pitch-border">
-                <span className="text-[10px] text-slate-400 block font-mono">Same Group Matches</span>
-                <span className="text-xl font-display font-bold text-cyan-300">
+              <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs">
+                <span className="text-[10px] text-slate-500 block font-mono font-bold">Same Group Matches</span>
+                <span className="text-xl font-display font-bold text-cyan-600">
                   {matchMath.sameGroupTotal}
                 </span>
               </div>
-              <div className="p-3 bg-pitch-panel/60 rounded-xl border border-pitch-border">
-                <span className="text-[10px] text-slate-400 block font-mono">Total Tournament Matches</span>
-                <span className="text-2xl font-display font-black text-amber-400">
+              <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs">
+                <span className="text-[10px] text-slate-500 block font-mono font-bold">Total Tournament Matches</span>
+                <span className="text-2xl font-display font-black text-amber-600">
                   {matchMath.total}
                 </span>
               </div>
             </div>
           </div>
 
-          <div className="pt-4 flex items-center justify-between border-t border-pitch-border">
+          <div className="pt-4 flex items-center justify-between border-t border-slate-200">
             <button
               onClick={() => setActiveStep(3)}
-              className="px-5 py-2.5 rounded-xl border border-pitch-border text-slate-300 hover:bg-pitch-panel text-sm font-semibold"
+              className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-sm font-semibold transition-colors"
             >
               Back
             </button>
             <button
               onClick={() => setActiveStep(5)}
-              className="px-6 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-sm flex items-center gap-2 shadow-glow-cyan"
+              className="px-6 py-2.5 rounded-xl bg-[#1d6bf3] hover:bg-[#1557c0] text-white font-bold text-sm flex items-center gap-2 shadow-md transition-all hover:scale-105 active:scale-95"
             >
               <span>Next: Review & Generate</span>
               <ArrowRight className="w-4 h-4" />
@@ -691,50 +698,50 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
 
       {/* Step 5: Review & Fixture Generation */}
       {activeStep === 5 && (
-        <div className="bg-pitch-card/90 border border-pitch-border rounded-3xl p-6 sm:p-8 shadow-xl space-y-6 animate-in fade-in">
-          <h3 className="font-display text-xl font-bold text-white">Step 5: Review & Generate Fixtures</h3>
-          <p className="text-xs text-slate-400">
+        <div className="bg-white/95 backdrop-blur-md border border-white/80 rounded-3xl p-6 sm:p-8 shadow-md space-y-6 animate-in fade-in">
+          <h3 className="font-display text-xl font-black text-slate-900">Step 5: Review & Generate Fixtures</h3>
+          <p className="text-xs text-slate-500 font-medium">
             Verify tournament rules before generating the full fixture schedule.
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="p-4 bg-pitch-darkest/70 border border-pitch-border rounded-2xl space-y-2 text-xs">
-              <span className="text-[10px] text-slate-400 uppercase font-mono block">Tournament Configuration</span>
-              <div className="flex justify-between py-1 border-b border-pitch-border/50">
-                <span className="text-slate-400">Name:</span>
-                <span className="font-bold text-white">{tournamentName}</span>
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2 text-xs">
+              <span className="text-[10px] text-slate-500 uppercase font-mono font-bold block">Tournament Configuration</span>
+              <div className="flex justify-between py-1 border-b border-slate-200">
+                <span className="text-slate-500">Name:</span>
+                <span className="font-bold text-slate-900">{tournamentName}</span>
               </div>
-              <div className="flex justify-between py-1 border-b border-pitch-border/50">
-                <span className="text-slate-400">Format:</span>
-                <span className="font-bold text-white">{groupFormat === 'SINGLE' ? 'Single Group' : '2 Groups (A & B)'}</span>
+              <div className="flex justify-between py-1 border-b border-slate-200">
+                <span className="text-slate-500">Format:</span>
+                <span className="font-bold text-slate-900">{groupFormat === 'SINGLE' ? 'Single Group' : '2 Groups (A & B)'}</span>
               </div>
               <div className="flex justify-between py-1">
-                <span className="text-slate-400">Total Registered:</span>
-                <span className="font-bold text-cyan-300">{wizardPlayers.length} Players</span>
+                <span className="text-slate-500">Total Registered:</span>
+                <span className="font-bold text-cyan-600">{wizardPlayers.length} Players</span>
               </div>
             </div>
 
-            <div className="p-4 bg-pitch-darkest/70 border border-pitch-border rounded-2xl space-y-2 text-xs">
-              <span className="text-[10px] text-slate-400 uppercase font-mono block">Match Schedule Math</span>
-              <div className="flex justify-between py-1 border-b border-pitch-border/50">
-                <span className="text-slate-400">Same Group Freq:</span>
-                <span className="font-bold text-white">{sameGroupFreq}x</span>
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2 text-xs">
+              <span className="text-[10px] text-slate-500 uppercase font-mono font-bold block">Match Schedule Math</span>
+              <div className="flex justify-between py-1 border-b border-slate-200">
+                <span className="text-slate-500">Same Group Freq:</span>
+                <span className="font-bold text-slate-900">{sameGroupFreq}x</span>
               </div>
-              <div className="flex justify-between py-1 border-b border-pitch-border/50">
-                <span className="text-slate-400">Cross Group Freq:</span>
-                <span className="font-bold text-white">{otherGroupFreq}x</span>
+              <div className="flex justify-between py-1 border-b border-slate-200">
+                <span className="text-slate-500">Cross Group Freq:</span>
+                <span className="font-bold text-slate-900">{otherGroupFreq}x</span>
               </div>
               <div className="flex justify-between py-1">
-                <span className="text-slate-400">Total Fixtures to Generate:</span>
-                <span className="font-bold text-amber-400 text-sm">{matchMath.total} Matches</span>
+                <span className="text-slate-500">Total Fixtures to Generate:</span>
+                <span className="font-bold text-amber-600 text-sm">{matchMath.total} Matches</span>
               </div>
             </div>
           </div>
 
           {/* Qualification Options for 2-Group */}
           {groupFormat === 'TWO_GROUPS' && (
-            <div className="p-4 bg-pitch-darkest/70 border border-pitch-border rounded-2xl space-y-3">
-              <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block">
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
                 Playoff Qualification Rule
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -743,12 +750,12 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
                   onClick={() => setQualMethod('TWO_GROUPS_TOP_2_EACH')}
                   className={`p-3 rounded-xl border text-xs font-bold text-left transition-all ${
                     qualMethod === 'TWO_GROUPS_TOP_2_EACH'
-                      ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300'
-                      : 'bg-pitch-panel border-pitch-border text-slate-300'
+                      ? 'bg-blue-50 border-[#1d6bf3] text-[#1d6bf3] shadow-xs'
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
                   }`}
                 >
                   <div>Top 2 from Each Group</div>
-                  <span className="text-[10px] text-slate-400 font-normal">A1 vs B2, B1 vs A2</span>
+                  <span className="text-[10px] text-slate-500 font-normal">A1 vs B2, B1 vs A2</span>
                 </button>
 
                 <button
@@ -756,12 +763,12 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
                   onClick={() => setQualMethod('TWO_GROUPS_OVERALL_TOP_4')}
                   className={`p-3 rounded-xl border text-xs font-bold text-left transition-all ${
                     qualMethod === 'TWO_GROUPS_OVERALL_TOP_4'
-                      ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300'
-                      : 'bg-pitch-panel border-pitch-border text-slate-300'
+                      ? 'bg-blue-50 border-[#1d6bf3] text-[#1d6bf3] shadow-xs'
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
                   }`}
                 >
                   <div>Combined Overall Top 4</div>
-                  <span className="text-[10px] text-slate-400 font-normal">Top 4 points overall</span>
+                  <span className="text-[10px] text-slate-500 font-normal">Top 4 points overall</span>
                 </button>
 
                 <button
@@ -769,30 +776,30 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
                   onClick={() => setQualMethod('TWO_GROUPS_CUSTOM')}
                   className={`p-3 rounded-xl border text-xs font-bold text-left transition-all ${
                     qualMethod === 'TWO_GROUPS_CUSTOM'
-                      ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300'
-                      : 'bg-pitch-panel border-pitch-border text-slate-300'
+                      ? 'bg-blue-50 border-[#1d6bf3] text-[#1d6bf3] shadow-xs'
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
                   }`}
                 >
                   <div>Custom Division</div>
-                  <span className="text-[10px] text-slate-400 font-normal">Specify count per group</span>
+                  <span className="text-[10px] text-slate-500 font-normal">Specify count per group</span>
                 </button>
               </div>
             </div>
           )}
 
           {/* Big Action Button */}
-          <div className="pt-4 flex items-center justify-between border-t border-pitch-border">
+          <div className="pt-4 flex items-center justify-between border-t border-slate-200">
             <button
               onClick={() => setActiveStep(4)}
-              className="px-5 py-2.5 rounded-xl border border-pitch-border text-slate-300 hover:bg-pitch-panel text-sm font-semibold"
+              className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-sm font-semibold transition-colors"
             >
               Back
             </button>
             <button
               onClick={handleStartGeneration}
-              className="px-8 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-display font-extrabold text-base hover:brightness-110 shadow-glow-green flex items-center gap-2 transition-all"
+              className="px-8 py-3 rounded-xl bg-[#10b981] hover:bg-[#059669] text-white font-display font-black text-sm sm:text-base shadow-md flex items-center gap-2 transition-all hover:scale-105 active:scale-95"
             >
-              <Calendar className="w-5 h-5 text-slate-950" />
+              <Calendar className="w-5 h-5 text-white" />
               <span>GENERATE TOURNAMENT FIXTURES</span>
             </button>
           </div>
@@ -801,17 +808,17 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
 
       {/* Confirmation Modal for regenerating fixtures (Requirement 13) */}
       {confirmRegenerateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in">
-          <div className="w-full max-w-md bg-pitch-card border border-rose-500/40 rounded-2xl p-6 shadow-2xl text-center space-y-4">
-            <AlertTriangle className="w-10 h-10 text-rose-400 mx-auto animate-bounce" />
-            <h4 className="font-display text-xl font-bold text-white">Regenerate All Fixtures?</h4>
-            <p className="text-xs text-rose-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in">
+          <div className="w-full max-w-md bg-white border border-rose-200 rounded-3xl p-6 shadow-2xl text-center space-y-4">
+            <AlertTriangle className="w-10 h-10 text-rose-500 mx-auto animate-bounce" />
+            <h4 className="font-display text-xl font-black text-slate-900">Regenerate All Fixtures?</h4>
+            <p className="text-xs text-rose-600 font-medium">
               ⚠️ Changing tournament group structure or match frequency will regenerate all fixtures. Existing match scores and statistics will be deleted.
             </p>
             <div className="flex items-center gap-3 pt-2">
               <button
                 onClick={() => setConfirmRegenerateModal(false)}
-                className="flex-1 py-2.5 rounded-xl border border-pitch-border text-slate-300 text-sm font-semibold"
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-sm font-bold hover:bg-slate-100 transition-colors"
               >
                 Cancel
               </button>
@@ -820,7 +827,7 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
                   setConfirmRegenerateModal(false);
                   executeFixtureGeneration();
                 }}
-                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm shadow-lg shadow-rose-900/50"
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm shadow-md transition-all active:scale-95"
               >
                 Continue & Regenerate
               </button>

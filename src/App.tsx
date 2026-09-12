@@ -27,7 +27,9 @@ import { QualificationModal } from './components/playoffs/QualificationModal';
 import { GoldenBootCelebrationModal } from './components/standings/GoldenBootCelebrationModal';
 import { PlayerProfileModal } from './components/players/PlayerProfileModal';
 
+import { SuperstarsBackdrop } from './components/layout/SuperstarsBackdrop';
 import { Match, PlayerStatistics } from './types/tournament';
+import { Lock, KeyRound } from 'lucide-react';
 
 const MainAppContent: React.FC = () => {
   const { 
@@ -37,6 +39,7 @@ const MainAppContent: React.FC = () => {
     selectedMatchForDetails, 
     setSelectedMatchForDetails,
     isLoading,
+    isAdmin,
   } = useTournament();
 
   const [adminLoginOpen, setAdminLoginOpen] = useState(false);
@@ -78,11 +81,14 @@ const MainAppContent: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen flex bg-slate-900 overflow-x-hidden font-sans">
+    <div className="min-h-screen flex bg-[#070d1e] overflow-x-hidden font-sans">
       
       {/* 1. Desktop Left Sidebar */}
       <div className="hidden md:block">
-        <Sidebar onOpenAdminLogin={() => setAdminLoginOpen(true)} />
+        <Sidebar 
+          onOpenAdminLogin={() => setAdminLoginOpen(true)}
+          onOpenResetModal={() => setResetModalOpen(true)}
+        />
       </div>
 
       {/* Mobile Drawer Sidebar */}
@@ -98,24 +104,26 @@ const MainAppContent: React.FC = () => {
               onOpenAdminLogin={() => {
                 setMobileSidebarOpen(false);
                 setAdminLoginOpen(true);
-              }} 
+              }}
+              onOpenResetModal={() => {
+                setMobileSidebarOpen(false);
+                setResetModalOpen(true);
+              }}
             />
           </div>
         </div>
       )}
 
       {/* 2. Main Content Area */}
-      <div className="flex-1 min-h-screen flex flex-col relative overflow-hidden bg-slate-100">
+      <div className="flex-1 min-h-screen flex flex-col relative overflow-hidden bg-[#070d1e]">
         
-        {/* Stadium Photo Hero Backdrop at Top */}
-        <div className="absolute top-0 left-0 right-0 h-[480px] sm:h-[520px] stadium-hero-bg z-0 pointer-events-none" />
-
-        {/* Turf Grass Backdrop at Bottom */}
-        <div className="absolute top-[400px] sm:top-[440px] left-0 right-0 bottom-0 turf-bg z-0 pointer-events-none" />
+        {/* Dedicated Section Wallpapers: Stadium on Home, Messi on Players, Ronaldo on Fixtures, Neymar on Standings */}
+        <SuperstarsBackdrop activeTab={activeTab} />
 
         {/* Floating Top Navigation Header */}
         <TopHeader
           onOpenAdminLogin={() => setAdminLoginOpen(true)}
+          onOpenResetModal={() => setResetModalOpen(true)}
           onToggleMobileSidebar={() => setMobileSidebarOpen(!mobileSidebarOpen)}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
@@ -192,7 +200,28 @@ const MainAppContent: React.FC = () => {
 
           {activeTab === 'admin' && (
             <div className="p-4 sm:p-8 max-w-7xl mx-auto w-full animate-in fade-in duration-200">
-              <TournamentWizard onOpenResetModal={() => setResetModalOpen(true)} />
+              {isAdmin ? (
+                <TournamentWizard onOpenResetModal={() => setResetModalOpen(true)} />
+              ) : (
+                <div className="bg-slate-950/60 backdrop-blur-xl border border-white/20 rounded-3xl p-8 sm:p-12 shadow-2xl max-w-md mx-auto text-center space-y-5 text-white my-10">
+                  <div className="w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-400/40 mx-auto flex items-center justify-center text-amber-400 shadow-lg">
+                    <Lock className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h3 className="font-display text-2xl font-black text-white">Admin Authentication Required</h3>
+                    <p className="text-xs sm:text-sm text-slate-300 mt-2">
+                      Tournament setup, roster configuration, and controls are protected. Please enter your Admin password to proceed.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setAdminLoginOpen(true)}
+                    className="w-full py-3.5 px-6 rounded-xl bg-[#1d6bf3] hover:bg-[#1557c0] text-white font-bold text-sm shadow-blue-glow transition-all flex items-center justify-center gap-2"
+                  >
+                    <KeyRound className="w-4 h-4" />
+                    <span>Enter Admin Password</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -222,10 +251,12 @@ const MainAppContent: React.FC = () => {
         }}
       />
 
-      <ResetModal
-        isOpen={resetModalOpen}
-        onClose={() => setResetModalOpen(false)}
-      />
+      {isAdmin && (
+        <ResetModal
+          isOpen={resetModalOpen}
+          onClose={() => setResetModalOpen(false)}
+        />
+      )}
 
       <ExportImportModal
         isOpen={exportImportOpen}

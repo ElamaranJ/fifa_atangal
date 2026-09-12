@@ -9,8 +9,8 @@ export const ProgressBar: React.FC = () => {
     { key: 'SETUP', label: 'Registration', tab: 'admin' },
     { key: 'FIXTURES', label: 'Fixtures', tab: 'fixtures' },
     { key: 'LEAGUE', label: 'League Stage', tab: 'standings' },
-    { key: 'QUALIFICATION', label: 'Qualification', tab: 'standings' },
-    { key: 'SEMI_FINALS', label: 'Semi Finals', tab: 'playoffs' },
+    { key: 'QUALIFICATION', label: 'Playoffs (Q1/Elim)', tab: 'playoffs' },
+    { key: 'QUALIFIER_2', label: 'Qualifier 2', tab: 'playoffs' },
     { key: 'FINAL', label: 'Grand Final', tab: 'playoffs' },
     { key: 'COMPLETED', label: 'Champion', tab: 'champion' },
   ];
@@ -19,8 +19,8 @@ export const ProgressBar: React.FC = () => {
   const getCurrentIndex = () => {
     if (tournament.status === 'COMPLETED' || playoffs.champion_player_id) return 6;
     if (tournament.status === 'FINAL' || (playoffs.final && playoffs.final.status === 'UPCOMING')) return 5;
-    if (tournament.status === 'SEMI_FINALS' || playoffs.semi_final_1) return 4;
-    if (tournament.status === 'QUALIFICATION') return 3;
+    if (playoffs.qualifier_2 && playoffs.qualifier_2.status === 'UPCOMING') return 4;
+    if (tournament.status === 'QUALIFICATION' || tournament.status === 'SEMI_FINALS' || playoffs.qualifier_1 || playoffs.semi_final_1) return 3;
     if (matches.length > 0 && tournament.status === 'LEAGUE') return 2;
     if (matches.length > 0) return 1;
     return 0;

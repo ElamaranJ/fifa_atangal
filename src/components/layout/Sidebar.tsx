@@ -30,7 +30,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenChangePassword,
   onNavigate 
 }) => {
-  const { activeTab, setActiveTab, isAdmin, logoutAdmin } = useTournament();
+  const { activeTab, setActiveTab, isAdmin, logoutAdmin, tournament } = useTournament();
 
   const handleSelectTab = (tabId: string) => {
     setActiveTab(tabId);
@@ -65,11 +65,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="flex items-center justify-between px-5 pt-4 pb-2 sm:pb-4">
           <div 
             onClick={() => handleSelectTab('home')}
-            className="flex items-center gap-3 cursor-pointer hover:opacity-90 transition-opacity"
+            className="flex items-center gap-2.5 cursor-pointer hover:opacity-90 transition-opacity min-w-0 flex-1"
           >
             {/* Gold Trophy Icon */}
-            <div className="w-10 h-10 flex items-center justify-center shrink-0">
-              <svg viewBox="0 0 36 36" className="w-9 h-9 drop-shadow-sm">
+            <div className="w-9 h-9 flex items-center justify-center shrink-0">
+              <svg viewBox="0 0 36 36" className="w-8 h-8 drop-shadow-sm">
                 <path fill="#FFD700" d="M11 4h14v12a7 7 0 0 1-14 0V4z"/>
                 <path fill="#F59E0B" d="M25 4h-2v12a5 5 0 0 1-5 5 5 5 0 0 0 5-5V4z"/>
                 <path fill="#FBBF24" d="M10 6H6a3 3 0 0 0-3 3v2a6 6 0 0 0 6 6h1V6zm16 0h4a3 3 0 0 1 3 3v2a6 6 0 0 1-6 6h-1V6z"/>
@@ -79,12 +79,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </svg>
             </div>
 
-            <div>
-              <h1 className="font-display font-extrabold text-lg tracking-tight text-slate-900 leading-none">
-                eFOOTBALL
+            <div className="min-w-0 flex-1">
+              <h1 className="font-display font-extrabold text-xs sm:text-sm tracking-tight text-slate-900 leading-tight truncate" title={tournament?.tournament_name}>
+                {tournament?.tournament_name || 'eFootball Championship'}
               </h1>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mt-1">
-                CHAMPIONSHIP 2026
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mt-0.5">
+                {tournament?.status === 'SETUP' ? 'Setup Phase' : (tournament?.status === 'SEMI_FINALS' || tournament?.status === 'FINAL') ? 'Playoffs' : 'League'}
               </span>
             </div>
           </div>

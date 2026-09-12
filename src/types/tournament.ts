@@ -16,7 +16,14 @@ export type QualificationMethod =
 
 export type MatchStatus = 'UPCOMING' | 'LIVE' | 'COMPLETED' | 'POSTPONED';
 
-export type MatchStage = 'LEAGUE' | 'SEMI_FINAL' | 'FINAL' | 'THIRD_PLACE';
+export type MatchStage = 
+  | 'LEAGUE' 
+  | 'SEMI_FINAL' 
+  | 'FINAL' 
+  | 'THIRD_PLACE' 
+  | 'QUALIFIER_1' 
+  | 'ELIMINATOR' 
+  | 'QUALIFIER_2';
 
 export interface Tournament {
   id: string;
@@ -93,9 +100,13 @@ export interface PlayerStatistics {
 }
 
 export interface PlayoffBracketData {
+  qualifier_1?: Match;
+  eliminator?: Match;
+  qualifier_2?: Match;
+  final?: Match;
+  // Legacy / fallback aliases
   semi_final_1?: Match;
   semi_final_2?: Match;
-  final?: Match;
   third_place?: Match;
   champion_player_id?: string;
   runner_up_player_id?: string;

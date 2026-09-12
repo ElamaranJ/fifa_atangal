@@ -3,9 +3,10 @@ import { useTournament } from '../../context/TournamentContext';
 import { Users, Gamepad2, Trophy, BarChart2 } from 'lucide-react';
 
 export const StatCardsRow: React.FC = () => {
-  const { players, matches, dynamicStats, tournament } = useTournament();
+  const { players, matches, dynamicStats, tournament, playoffs } = useTournament();
 
-  const totalMatches = matches.length || 28;
+  const champion = players.find(p => p.id === playoffs?.champion_player_id);
+  const totalMatches = matches.length;
   const completedMatches = dynamicStats.completed_matches;
   const progressPercent = totalMatches > 0 ? Math.round((completedMatches / totalMatches) * 100) : 0;
 
@@ -37,7 +38,7 @@ export const StatCardsRow: React.FC = () => {
             {totalMatches}
           </span>
           <span className="text-[10px] sm:text-[11px] font-medium text-slate-400 block truncate">
-            {tournament.group_format === 'SINGLE' ? '(League Stage)' : '(Group Stage)'}
+            {tournament.status === 'SETUP' ? '(Setup Phase)' : tournament.group_format === 'SINGLE' ? '(League Stage)' : '(Group Stage)'}
           </span>
         </div>
       </div>
@@ -84,18 +85,20 @@ export const StatCardsRow: React.FC = () => {
         </div>
       </div>
 
-      {/* Card 5: Current Stage */}
-      <div className="col-span-2 sm:col-span-1 bg-white rounded-2xl p-3 sm:p-4 shadow-sm border border-slate-100 flex items-start gap-2.5 sm:gap-3.5 hover:shadow-md transition-shadow">
-        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center shrink-0">
+      {/* Card 5: Current Stage / Champion */}
+      <div className={`col-span-2 sm:col-span-1 rounded-2xl p-3 sm:p-4 shadow-sm border flex items-start gap-2.5 sm:gap-3.5 hover:shadow-md transition-all ${champion ? 'bg-gradient-to-br from-amber-500/10 via-yellow-400/10 to-white border-amber-300' : 'bg-white border-slate-100'}`}>
+        <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center shrink-0 ${champion ? 'bg-amber-500 text-slate-950 font-bold shadow-sm' : 'bg-amber-50 text-amber-500'}`}>
           <Trophy className="w-4 h-4 sm:w-5 sm:h-5" />
         </div>
         <div className="min-w-0 flex-1">
-          <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500 block truncate">Current Stage</span>
-          <span className="text-base sm:text-lg font-display font-black text-slate-900 block leading-tight truncate">
-            {tournament.status === 'COMPLETED' ? 'Champion Crowned' : tournament.status === 'FINAL' ? 'Grand Final' : tournament.status === 'SEMI_FINALS' ? 'Semi Finals' : 'League Stage'}
-          </span>
           <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500 block truncate">
-            Round 2 of 7
+            {champion ? 'Winner / Champion' : 'Current Stage'}
+          </span>
+          <span className={`text-base sm:text-lg font-display font-black block leading-tight truncate ${champion ? 'text-amber-700' : 'text-slate-900'}`}>
+            {champion ? champion.player_name : tournament.status === 'SETUP' ? 'Setup Phase' : tournament.status === 'COMPLETED' ? 'Champion Crowned' : tournament.status === 'FINAL' ? 'Grand Final' : tournament.status === 'SEMI_FINALS' ? 'Semi Finals' : 'League Stage'}
+          </span>
+          <span className={`text-[10px] sm:text-[11px] font-bold block truncate ${champion ? 'text-amber-600' : 'text-slate-500'}`}>
+            {champion ? '🏆 1st Place Champion' : tournament.status === 'SETUP' ? (players.length >= 2 ? `${players.length} Competitors` : 'Adding Players') : dynamicStats.completed_matches > 0 ? `${dynamicStats.completed_matches} Played` : 'In Progress'}
           </span>
         </div>
       </div>

@@ -3,7 +3,7 @@ import { useTournament } from '../../context/TournamentContext';
 import { PlayerAvatar } from '../common/PlayerAvatar';
 import { FootballBootIcon } from '../common/FootballBootIcon';
 import { Match, PlayerStatistics } from '../../types/tournament';
-import { Calendar, BarChart2, ChevronRight, Play } from 'lucide-react';
+import { Calendar, BarChart2, ChevronRight, Play, Trophy } from 'lucide-react';
 
 interface ReferenceBottomCardsProps {
   onEnterScore: (match: Match) => void;
@@ -16,35 +16,124 @@ export const ReferenceBottomCards: React.FC<ReferenceBottomCardsProps> = ({
   onSelectMatch,
   onSelectPlayer,
 }) => {
-  const { matches, players, overallStats, goldenBootLeaders, setActiveTab, isAdmin } = useTournament();
+  const { matches, players, overallStats, goldenBootLeaders, setActiveTab, isAdmin, playoffs } = useTournament();
 
   const upcomingMatches = matches.filter(m => m.status !== 'COMPLETED').slice(0, 4);
+  const champion = players.find(p => p.id === playoffs?.champion_player_id);
+  const runnerUp = players.find(p => p.id === playoffs?.runner_up_player_id);
+  const thirdPlace = players.find(p => p.id === playoffs?.third_place_player_id);
+  const finalMatch = playoffs?.final;
 
   const getPlayer = (id: string) => players.find(p => p.id === id);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5 px-3 sm:px-8 pb-10 relative z-10">
       
-      {/* 1. Upcoming Matches Card */}
+      {/* 1. Upcoming Matches / Championship Final Card */}
       <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-100 flex flex-col justify-between">
         <div>
           <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
             <div className="flex items-center gap-2.5">
-              <Calendar className="w-5 h-5 text-[#1d6bf3]" />
+              {champion ? (
+                <Trophy className="w-5 h-5 text-amber-500" />
+              ) : (
+                <Calendar className="w-5 h-5 text-[#1d6bf3]" />
+              )}
               <h3 className="font-display font-bold text-base text-slate-900">
-                Upcoming Matches
+                {champion ? 'Championship Podium' : 'Upcoming Matches'}
               </h3>
             </div>
             <button
-              onClick={() => setActiveTab('fixtures')}
+              onClick={() => setActiveTab(champion ? 'champion' : 'fixtures')}
               className="text-xs font-bold text-[#1d6bf3] hover:underline"
             >
-              View All
+              {champion ? 'View Hall 🏆' : 'View All'}
             </button>
           </div>
 
           <div className="space-y-3.5">
-            {upcomingMatches.map((m) => {
+            {upcomingMatches.length === 0 ? (
+              champion ? (
+                <div className="py-2 space-y-3">
+                  {/* Champion Winner Feature Card */}
+                  <div className="p-3 rounded-2xl bg-gradient-to-r from-amber-500/15 via-yellow-400/10 to-amber-500/5 border border-amber-300/80 flex items-center gap-3">
+                    <PlayerAvatar name={champion.player_name} photo={champion.player_photo} size="md" glow />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                        <span className="text-[10px] font-mono font-bold uppercase text-amber-700 tracking-wider">
+                          1st Place • Champion
+                        </span>
+                      </div>
+                      <h4 className="font-display font-black text-slate-900 text-sm truncate">
+                        {champion.player_name}
+                      </h4>
+                      {finalMatch && finalMatch.status === 'COMPLETED' && (
+                        <span className="text-[11px] font-mono font-semibold text-slate-600 block">
+                          Won Final: {finalMatch.player_1_score} - {finalMatch.player_2_score}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Runner-Up & 3rd Place */}
+                  <div className="space-y-1.5 text-xs">
+                    {runnerUp && (
+                      <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200/80">
+                        <span className="text-slate-500 font-medium flex items-center gap-1">
+                          <span>🥈</span> Runner-Up:
+                        </span>
+                        <span className="font-bold text-slate-800">{runnerUp.player_name}</span>
+                      </div>
+                    )}
+                    {thirdPlace && (
+                      <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200/80">
+                        <span className="text-slate-500 font-medium flex items-center gap-1">
+                          <span>🥉</span> 3rd Place:
+                        </span>
+                        <span className="font-bold text-slate-800">{thirdPlace.player_name}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Quick Action Navigation */}
+                  <div className="pt-1 flex gap-2">
+                    <button
+                      onClick={() => setActiveTab('champion')}
+                      className="flex-1 py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-sm flex items-center justify-center gap-1.5 transition-all"
+                    >
+                      <Trophy className="w-3.5 h-3.5" />
+                      <span>Hall of Champions</span>
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('playoffs')}
+                      className="py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors"
+                    >
+                      Playoff Bracket
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="py-8 text-center space-y-2">
+                  <Calendar className="w-8 h-8 text-slate-300 mx-auto" />
+                  <p className="text-xs font-bold text-slate-700">No Upcoming Fixtures</p>
+                  <p className="text-[11px] text-slate-400 max-w-[220px] mx-auto">
+                    {players.length >= 2 
+                      ? `${players.length} players registered. Generate fixtures in Admin Setup to schedule matches.`
+                      : 'Register players and generate fixtures in Admin Setup to start.'}
+                  </p>
+                  {isAdmin && (
+                    <button
+                      onClick={() => setActiveTab('admin')}
+                      className="mt-2 px-3.5 py-1.5 rounded-xl bg-[#1d6bf3] text-white text-xs font-bold shadow-xs hover:bg-[#1557c0] transition-colors"
+                    >
+                      Setup Wizard →
+                    </button>
+                  )}
+                </div>
+              )
+            ) : (
+              upcomingMatches.map((m) => {
               const p1 = getPlayer(m.player_1);
               const p2 = getPlayer(m.player_2);
 
@@ -97,7 +186,7 @@ export const ReferenceBottomCards: React.FC<ReferenceBottomCardsProps> = ({
                   </div>
                 </div>
               );
-            })}
+            }))}
           </div>
         </div>
       </div>
@@ -121,7 +210,16 @@ export const ReferenceBottomCards: React.FC<ReferenceBottomCardsProps> = ({
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
+            {overallStats.length === 0 ? (
+              <div className="py-8 text-center space-y-2">
+                <BarChart2 className="w-8 h-8 text-slate-300 mx-auto" />
+                <p className="text-xs font-bold text-slate-700">No Standings Yet</p>
+                <p className="text-[11px] text-slate-400 max-w-[220px] mx-auto">
+                  Player standings will appear here once players are registered.
+                </p>
+              </div>
+            ) : (
+              <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
                   <th className="py-2 px-1 text-center w-6">#</th>
@@ -217,6 +315,7 @@ export const ReferenceBottomCards: React.FC<ReferenceBottomCardsProps> = ({
                 })}
               </tbody>
             </table>
+            )}
           </div>
         </div>
       </div>
@@ -240,7 +339,18 @@ export const ReferenceBottomCards: React.FC<ReferenceBottomCardsProps> = ({
           </div>
 
           <div className="space-y-3 pt-1">
-            {goldenBootLeaders.slice(0, 6).map((player) => {
+            {goldenBootLeaders.length === 0 || goldenBootLeaders.every(l => l.total_goals === 0) ? (
+              <div className="py-8 text-center space-y-2">
+                <div className="flex justify-center opacity-40">
+                  <FootballBootIcon variant="dark" width={32} height={20} />
+                </div>
+                <p className="text-xs font-bold text-slate-700">No Goals Scored Yet</p>
+                <p className="text-[11px] text-slate-400 max-w-[220px] mx-auto">
+                  Golden boot rankings will update automatically as match results are recorded.
+                </p>
+              </div>
+            ) : (
+              goldenBootLeaders.slice(0, 6).map((player) => {
               const isFirst = player.golden_boot_rank === 1;
               const isSecond = player.golden_boot_rank === 2;
               const isThird = player.golden_boot_rank === 3;
@@ -289,7 +399,7 @@ export const ReferenceBottomCards: React.FC<ReferenceBottomCardsProps> = ({
                   </div>
                 </div>
               );
-            })}
+            }))}
           </div>
         </div>
       </div>

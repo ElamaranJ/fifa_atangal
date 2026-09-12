@@ -13,7 +13,7 @@ export const FixtureList: React.FC<FixtureListProps> = ({
   onSelectMatch,
   onEnterScore,
 }) => {
-  const { matches, players, tournament } = useTournament();
+  const { matches, players, tournament, setActiveTab, isAdmin } = useTournament();
 
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'UPCOMING' | 'COMPLETED'>('ALL');
   const [groupFilter, setGroupFilter] = useState<string>('ALL');
@@ -180,10 +180,24 @@ export const FixtureList: React.FC<FixtureListProps> = ({
 
       {/* Fixture Grid */}
       {filteredMatches.length === 0 ? (
-        <div className="p-12 text-center bg-slate-950/45 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl text-white">
-          <Calendar className="w-10 h-10 text-cyan-400/70 mx-auto mb-2" />
-          <h3 className="text-sm font-bold text-white">No matches found</h3>
-          <p className="text-xs text-slate-300 mt-1">Try resetting the filters or generate new fixtures.</p>
+        <div className="p-12 text-center bg-slate-950/45 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl text-white space-y-3">
+          <Calendar className="w-12 h-12 text-cyan-400/70 mx-auto" />
+          <h3 className="text-base font-bold text-white">
+            {matches.length === 0 ? 'No Fixtures Scheduled Yet' : 'No Matching Fixtures Found'}
+          </h3>
+          <p className="text-xs text-slate-300 max-w-sm mx-auto">
+            {matches.length === 0
+              ? `${players.length} players registered. Generate the schedule in the Admin Setup Wizard to activate match fixtures.`
+              : 'Try clearing your player search or switching round/group filters.'}
+          </p>
+          {matches.length === 0 && isAdmin && (
+            <button
+              onClick={() => setActiveTab('admin')}
+              className="mt-2 px-4 py-2 rounded-xl bg-[#1d6bf3] hover:bg-[#1557c0] text-white text-xs font-bold shadow-blue-glow transition-all"
+            >
+              Open Setup Wizard →
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

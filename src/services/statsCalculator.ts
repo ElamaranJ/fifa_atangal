@@ -90,8 +90,8 @@ export function recalculateTournamentState(
       m.player_1_score !== null && m.player_1_score !== undefined &&
       m.player_2_score !== null && m.player_2_score !== undefined &&
       !isNaN(Number(m.player_1_score)) && !isNaN(Number(m.player_2_score));
-    const isNotPlayoff = m.stage !== 'SEMI_FINAL' && m.stage !== 'FINAL' && m.stage !== 'THIRD_PLACE';
-    return isCompleted && hasScores && isNotPlayoff;
+    const isLeagueMatch = m.stage === 'LEAGUE';
+    return isCompleted && hasScores && isLeagueMatch;
   });
 
   // Initialize stats dictionary for all players

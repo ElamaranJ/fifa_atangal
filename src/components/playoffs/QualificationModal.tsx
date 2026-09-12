@@ -70,7 +70,7 @@ export const QualificationModal: React.FC = () => {
           🔥 TOP 4 QUALIFIED 🔥
         </h2>
         <p className="text-sm text-slate-300 mb-8 max-w-md mx-auto">
-          The league battle has concluded! The top four contenders have officially booked their tickets to the Semi Finals!
+          The league battle has concluded! Contenders #1 & #2 earn a double chance in <span className="text-emerald-400 font-bold">Qualifier 1</span>, while #3 & #4 enter the high-stakes <span className="text-rose-400 font-bold">Eliminator</span>!
         </p>
 
         {/* 4 Qualified Player Cards with staggered animated appearance */}
@@ -97,8 +97,12 @@ export const QualificationModal: React.FC = () => {
               <span className="text-[11px] text-slate-400 font-mono mt-0.5">
                 {player.points} PTS • {player.total_goals} G
               </span>
-              <div className="mt-2 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                QUALIFIED 🟢
+              <div className={`mt-2 text-[9px] uppercase font-mono font-bold tracking-wider px-2 py-0.5 rounded border ${
+                idx < 2 
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' 
+                  : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+              }`}>
+                {idx < 2 ? 'QUALIFIER 1 🟢' : 'ELIMINATOR ⚡'}
               </div>
             </div>
           ))}

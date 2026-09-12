@@ -61,7 +61,13 @@ export const ScoreEntryModal: React.FC<ScoreEntryModalProps> = ({ match, isOpen,
       }
     }
 
-    if (match.stage === 'SEMI_FINAL') {
+    if (match.stage === 'QUALIFIER_1') {
+      submitPlayoffResult('QUALIFIER_1', s1, s2, isDrawn ? p1Pens : undefined, isDrawn ? p2Pens : undefined);
+    } else if (match.stage === 'ELIMINATOR') {
+      submitPlayoffResult('ELIMINATOR', s1, s2, isDrawn ? p1Pens : undefined, isDrawn ? p2Pens : undefined);
+    } else if (match.stage === 'QUALIFIER_2') {
+      submitPlayoffResult('QUALIFIER_2', s1, s2, isDrawn ? p1Pens : undefined, isDrawn ? p2Pens : undefined);
+    } else if (match.stage === 'SEMI_FINAL') {
       const stageKey = match.group?.includes('1') ? 'SEMI_FINAL_1' : 'SEMI_FINAL_2';
       submitPlayoffResult(stageKey, s1, s2, isDrawn ? p1Pens : undefined, isDrawn ? p2Pens : undefined);
     } else if (match.stage === 'FINAL') {

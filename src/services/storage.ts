@@ -104,6 +104,32 @@ function getActiveDocRef() {
 }
 
 /**
+ * Recursively removes any object keys whose value is undefined,
+ * and strips undefined values from arrays.
+ * This guarantees complete compatibility with Firestore SDK which rejects undefined anywhere in document trees.
+ */
+export function removeUndefinedDeep<T>(obj: T): T {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj
+      .filter((item) => item !== undefined)
+      .map((item) => removeUndefinedDeep(item)) as unknown as T;
+  }
+  if (typeof obj === 'object') {
+    const result: Record<string, any> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        result[key] = removeUndefinedDeep(value);
+      }
+    }
+    return result as T;
+  }
+  return obj;
+}
+
+/**
  * Storage Service interfacing with Firebase Cloud Firestore
  * (with fallback to localStorage when Firebase credentials are not yet configured)
  */
@@ -122,18 +148,32 @@ export const StorageService = {
           docRef,
           (snapshot) => {
             if (snapshot.exists()) {
-              onUpdate(snapshot.data() as TournamentFirestoreDoc);
+              const docData = snapshot.data() as TournamentFirestoreDoc;
+              // Mirror into localStorage for instant offline access and refresh safety
+              try {
+                StorageService.saveAllLocal(docData);
+              } catch (e) {
+                console.warn('[Storage] Failed to mirror to localStorage:', e);
+              }
+              onUpdate(docData);
             } else {
               onUpdate(null);
             }
           },
           (err) => {
             console.error('[Firestore] Real-time onSnapshot error:', err);
+            // Fallback to local storage if Firestore encounters an error
+            const localData = StorageService.loadAllLocal();
+            if (localData) {
+              onUpdate(localData);
+            }
             onError?.(err);
           }
         );
       } catch (err) {
         console.error('[Firestore] Failed to attach listener:', err);
+        const localData = StorageService.loadAllLocal();
+        if (localData) onUpdate(localData);
         onError?.(err as Error);
       }
     }
@@ -158,14 +198,14 @@ export const StorageService = {
         const docRef = getActiveDocRef();
         const snap = await getDoc(docRef);
         if (!snap.exists()) {
-          const initialDoc: TournamentFirestoreDoc = {
+          const initialDoc: TournamentFirestoreDoc = removeUndefinedDeep({
             tournament,
             players,
             matches,
             playoffs,
             adminPin: DEFAULT_ADMIN_PIN,
             updatedAt: new Date().toISOString(),
-          };
+          });
           await setDoc(docRef, initialDoc);
           console.log('[Firestore] Seeded initial demo tournament to Firestore.');
           return true;
@@ -222,16 +262,69 @@ export const StorageService = {
     playoffs?: PlayoffBracketData;
     rules?: TournamentRulesData;
   }): Promise<void> {
-    const payload: Record<string, any> = {
-      updatedAt: new Date().toISOString(),
-    };
-    if (state.tournament !== undefined) payload.tournament = state.tournament;
-    if (state.players !== undefined) payload.players = state.players;
-    if (state.matches !== undefined) payload.matches = state.matches;
-    if (state.playoffs !== undefined) payload.playoffs = state.playoffs;
-    if (state.rules !== undefined) payload.rules = state.rules;
+    // 1. Immediately persist synchronously to localStorage for zero-latency refresh
+    try {
+      if (state.tournament !== undefined) {
+        localStorage.setItem(STORAGE_KEYS.TOURNAMENT, JSON.stringify(state.tournament));
+      }
+      if (state.players !== undefined) {
+        localStorage.setItem(STORAGE_KEYS.PLAYERS, JSON.stringify(state.players));
+      }
+      if (state.matches !== undefined) {
+        localStorage.setItem(STORAGE_KEYS.MATCHES, JSON.stringify(state.matches));
+      }
+      if (state.playoffs !== undefined) {
+        localStorage.setItem(STORAGE_KEYS.PLAYOFFS, JSON.stringify(state.playoffs));
+      }
+      if (state.rules !== undefined) {
+        localStorage.setItem(STORAGE_KEYS.RULES, JSON.stringify(state.rules));
+      }
+    } catch (localErr) {
+      console.warn('[Storage] LocalStorage write error in saveTournamentState:', localErr);
+    }
+
+    // 2. Persist to Firestore if configured
+    if (isFirebaseConfigured && db) {
+      const rawPayload: Record<string, any> = {
+        updatedAt: new Date().toISOString(),
+      };
+      if (state.tournament !== undefined) rawPayload.tournament = state.tournament;
+      if (state.players !== undefined) rawPayload.players = state.players;
+      if (state.matches !== undefined) rawPayload.matches = state.matches;
+      if (state.playoffs !== undefined) rawPayload.playoffs = state.playoffs;
+      if (state.rules !== undefined) rawPayload.rules = state.rules;
+
+      // Deep clean to eliminate any undefined values which Firestore SDK strictly rejects
+      const payload = removeUndefinedDeep(rawPayload);
+
+      try {
+        await updateDoc(getActiveDocRef(), payload);
+        return;
+      } catch (updateErr) {
+        console.warn('[Storage] updateDoc failed, attempting setDoc with merge:', updateErr);
+        try {
+          await setDoc(getActiveDocRef(), payload, { merge: true });
+          return;
+        } catch (setErr) {
+          console.error('[Storage] setDoc failed in saveTournamentState:', setErr);
+          throw setErr;
+        }
+      }
+    }
+  },
+
+  async saveTournament(tournament: Tournament): Promise<void> {
+    try {
+      localStorage.setItem(STORAGE_KEYS.TOURNAMENT, JSON.stringify(tournament));
+    } catch (e) {
+      console.warn('[Storage] LocalStorage saveTournament error:', e);
+    }
 
     if (isFirebaseConfigured && db) {
+      const payload = removeUndefinedDeep({
+        tournament,
+        updatedAt: new Date().toISOString(),
+      });
       try {
         await updateDoc(getActiveDocRef(), payload);
         return;
@@ -240,138 +333,154 @@ export const StorageService = {
         return;
       }
     }
-
-    if (state.tournament !== undefined) {
-      localStorage.setItem(STORAGE_KEYS.TOURNAMENT, JSON.stringify(state.tournament));
-    }
-    if (state.players !== undefined) {
-      localStorage.setItem(STORAGE_KEYS.PLAYERS, JSON.stringify(state.players));
-    }
-    if (state.matches !== undefined) {
-      localStorage.setItem(STORAGE_KEYS.MATCHES, JSON.stringify(state.matches));
-    }
-    if (state.playoffs !== undefined) {
-      localStorage.setItem(STORAGE_KEYS.PLAYOFFS, JSON.stringify(state.playoffs));
-    }
-    if (state.rules !== undefined) {
-      localStorage.setItem(STORAGE_KEYS.RULES, JSON.stringify(state.rules));
-    }
   },
 
-  async saveTournament(tournament: Tournament): Promise<void> {
-    if (isFirebaseConfigured && db) {
-      try {
-        await updateDoc(getActiveDocRef(), {
-          tournament,
-          updatedAt: new Date().toISOString(),
-        });
-        return;
-      } catch {
-        // If document doesn't exist yet, use setDoc with merge
-        await setDoc(getActiveDocRef(), {
-          tournament,
-          updatedAt: new Date().toISOString(),
-        }, { merge: true });
-        return;
-      }
+  loadTournamentLocal(): Tournament | null {
+    const tData = localStorage.getItem(STORAGE_KEYS.TOURNAMENT);
+    if (!tData) return null;
+    try {
+      return JSON.parse(tData);
+    } catch {
+      return null;
     }
-    localStorage.setItem(STORAGE_KEYS.TOURNAMENT, JSON.stringify(tournament));
   },
 
   async loadTournament(): Promise<Tournament | null> {
     const docData = await this.loadTournamentDoc();
-    return docData ? docData.tournament : null;
+    return docData ? docData.tournament : this.loadTournamentLocal();
   },
 
   async savePlayers(players: Player[]): Promise<void> {
+    try {
+      localStorage.setItem(STORAGE_KEYS.PLAYERS, JSON.stringify(players));
+    } catch (e) {
+      console.warn('[Storage] LocalStorage savePlayers error:', e);
+    }
+
     if (isFirebaseConfigured && db) {
+      const payload = removeUndefinedDeep({
+        players,
+        updatedAt: new Date().toISOString(),
+      });
       try {
-        await updateDoc(getActiveDocRef(), {
-          players,
-          updatedAt: new Date().toISOString(),
-        });
+        await updateDoc(getActiveDocRef(), payload);
         return;
       } catch {
-        await setDoc(getActiveDocRef(), {
-          players,
-          updatedAt: new Date().toISOString(),
-        }, { merge: true });
+        await setDoc(getActiveDocRef(), payload, { merge: true });
         return;
       }
     }
-    localStorage.setItem(STORAGE_KEYS.PLAYERS, JSON.stringify(players));
+  },
+
+  loadPlayersLocal(): Player[] | null {
+    const pData = localStorage.getItem(STORAGE_KEYS.PLAYERS);
+    if (!pData) return null;
+    try {
+      return JSON.parse(pData);
+    } catch {
+      return null;
+    }
   },
 
   async loadPlayers(): Promise<Player[]> {
     const docData = await this.loadTournamentDoc();
-    return docData ? docData.players : [];
+    return docData ? docData.players : (this.loadPlayersLocal() || []);
   },
 
   async saveMatches(matches: Match[]): Promise<void> {
+    try {
+      localStorage.setItem(STORAGE_KEYS.MATCHES, JSON.stringify(matches));
+    } catch (e) {
+      console.warn('[Storage] LocalStorage saveMatches error:', e);
+    }
+
     if (isFirebaseConfigured && db) {
+      const payload = removeUndefinedDeep({
+        matches,
+        updatedAt: new Date().toISOString(),
+      });
       try {
-        await updateDoc(getActiveDocRef(), {
-          matches,
-          updatedAt: new Date().toISOString(),
-        });
+        await updateDoc(getActiveDocRef(), payload);
         return;
       } catch {
-        await setDoc(getActiveDocRef(), {
-          matches,
-          updatedAt: new Date().toISOString(),
-        }, { merge: true });
+        await setDoc(getActiveDocRef(), payload, { merge: true });
         return;
       }
     }
-    localStorage.setItem(STORAGE_KEYS.MATCHES, JSON.stringify(matches));
+  },
+
+  loadMatchesLocal(): Match[] | null {
+    const mData = localStorage.getItem(STORAGE_KEYS.MATCHES);
+    if (!mData) return null;
+    try {
+      return JSON.parse(mData);
+    } catch {
+      return null;
+    }
   },
 
   async loadMatches(): Promise<Match[]> {
     const docData = await this.loadTournamentDoc();
-    return docData ? docData.matches : [];
+    return docData ? docData.matches : (this.loadMatchesLocal() || []);
   },
 
   async savePlayoffs(playoffs: PlayoffBracketData): Promise<void> {
+    try {
+      localStorage.setItem(STORAGE_KEYS.PLAYOFFS, JSON.stringify(playoffs));
+    } catch (e) {
+      console.warn('[Storage] LocalStorage savePlayoffs error:', e);
+    }
+
     if (isFirebaseConfigured && db) {
+      const payload = removeUndefinedDeep({
+        playoffs,
+        updatedAt: new Date().toISOString(),
+      });
       try {
-        await updateDoc(getActiveDocRef(), {
-          playoffs,
-          updatedAt: new Date().toISOString(),
-        });
+        await updateDoc(getActiveDocRef(), payload);
         return;
       } catch {
-        await setDoc(getActiveDocRef(), {
-          playoffs,
-          updatedAt: new Date().toISOString(),
-        }, { merge: true });
+        await setDoc(getActiveDocRef(), payload, { merge: true });
         return;
       }
     }
-    localStorage.setItem(STORAGE_KEYS.PLAYOFFS, JSON.stringify(playoffs));
+  },
+
+  loadPlayoffsLocal(): PlayoffBracketData | null {
+    const pData = localStorage.getItem(STORAGE_KEYS.PLAYOFFS);
+    if (!pData) return null;
+    try {
+      return JSON.parse(pData);
+    } catch {
+      return null;
+    }
   },
 
   async loadPlayoffs(): Promise<PlayoffBracketData> {
     const docData = await this.loadTournamentDoc();
-    return docData ? docData.playoffs : {};
+    return docData ? docData.playoffs : (this.loadPlayoffsLocal() || {});
   },
 
   async saveRules(rules: TournamentRulesData): Promise<void> {
+    try {
+      localStorage.setItem(STORAGE_KEYS.RULES, JSON.stringify(rules));
+    } catch (e) {
+      console.warn('[Storage] LocalStorage saveRules error:', e);
+    }
+
     if (isFirebaseConfigured && db) {
+      const payload = removeUndefinedDeep({
+        rules,
+        updatedAt: new Date().toISOString(),
+      });
       try {
-        await updateDoc(getActiveDocRef(), {
-          rules,
-          updatedAt: new Date().toISOString(),
-        });
+        await updateDoc(getActiveDocRef(), payload);
         return;
       } catch {
-        await setDoc(getActiveDocRef(), {
-          rules,
-          updatedAt: new Date().toISOString(),
-        }, { merge: true });
+        await setDoc(getActiveDocRef(), payload, { merge: true });
         return;
       }
     }
-    localStorage.setItem(STORAGE_KEYS.RULES, JSON.stringify(rules));
   },
 
   async loadRules(): Promise<TournamentRulesData> {
@@ -504,17 +613,19 @@ export const StorageService = {
    * Resets results only (sets all completed scores back to null)
    */
   resetResultsOnly(matches: Match[]): Match[] {
-    return matches.map(m => ({
-      ...m,
-      player_1_score: null,
-      player_2_score: null,
-      status: 'UPCOMING',
-      penalties_played: false,
-      player_1_penalty_score: null,
-      player_2_penalty_score: null,
-      winner_id: null,
-      completed_at: undefined,
-    }));
+    return matches.map(m => {
+      const { completed_at, ...rest } = m;
+      return {
+        ...rest,
+        player_1_score: null,
+        player_2_score: null,
+        status: 'UPCOMING',
+        penalties_played: false,
+        player_1_penalty_score: null,
+        player_2_penalty_score: null,
+        winner_id: null,
+      };
+    });
   },
 
   /**

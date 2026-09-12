@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useTournament } from '../../context/TournamentContext';
-import { Player, GroupFormat, QualificationMethod } from '../../types/tournament';
+import { Tournament, Player, GroupFormat, QualificationMethod } from '../../types/tournament';
 import { PlayerAvatar } from '../common/PlayerAvatar';
 import { compressImage } from '../../services/storage';
 import { calculateTheoreticalMatches } from '../../services/fixtureGenerator';
@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   RotateCcw,
   KeyRound,
+  Save,
 } from 'lucide-react';
 
 interface TournamentWizardProps {
@@ -33,6 +34,7 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
     matches, 
     updateTournament, 
     setPlayersList, 
+    saveTournamentAndPlayers,
     generateTournamentFixtures, 
     startPlayoffs, 
     setActiveTab,
@@ -57,16 +59,34 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
     if (players.length > 0) return [...players];
     const initial: Player[] = [];
     for (let i = 0; i < 8; i++) {
-      initial.push({
+      const p: Player = {
         id: `p_${Date.now()}_${i + 1}`,
         tournament_id: tournament.id,
         player_name: `Player ${String.fromCharCode(65 + i)}`,
-        group_name: tournament.group_format === 'TWO_GROUPS' ? (i % 2 === 0 ? 'Group A' : 'Group B') : undefined,
         created_at: new Date().toISOString(),
-      });
+      };
+      if (tournament.group_format === 'TWO_GROUPS') {
+        p.group_name = i % 2 === 0 ? 'Group A' : 'Group B';
+      }
+      initial.push(p);
     }
     return initial;
   });
+
+  // Helper to build a clean Player object without undefined properties (which crash Firestore)
+  const buildCleanPlayer = (p: Player, idx: number, format: GroupFormat): Player => {
+    const clean: Player = {
+      id: p.id,
+      tournament_id: tournament.id,
+      player_name: p.player_name,
+      created_at: p.created_at || new Date().toISOString(),
+    };
+    if (p.player_photo) clean.player_photo = p.player_photo;
+    if (format === 'TWO_GROUPS') {
+      clean.group_name = p.group_name || (idx % 2 === 0 ? 'Group A' : 'Group B');
+    }
+    return clean;
+  };
 
   const [statusAlert, setStatusAlert] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
   const [confirmRegenerateModal, setConfirmRegenerateModal] = useState<boolean>(false);
@@ -74,19 +94,154 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingPlayerId, setUploadingPlayerId] = useState<string | null>(null);
 
-  const hasInitializedFromPlayers = useRef(players.length > 0);
   const isUserDirty = useRef(false);
 
-  // Sync with context players only once on initial mount if not already loaded, avoiding overwriting in-progress edits
+  // Sync with context tournament when loaded from database
   React.useEffect(() => {
-    if (!hasInitializedFromPlayers.current && players.length > 0) {
-      hasInitializedFromPlayers.current = true;
-      if (!isUserDirty.current) {
-        setWizardPlayers([...players]);
-        setNumPlayersInput(players.length);
-      }
+    if (!isUserDirty.current) {
+      if (tournament.tournament_name) setTournamentName(tournament.tournament_name);
+      if (tournament.win_points !== undefined) setWinPoints(tournament.win_points);
+      if (tournament.draw_points !== undefined) setDrawPoints(tournament.draw_points);
+      if (tournament.loss_points !== undefined) setLossPoints(tournament.loss_points);
+      if (tournament.group_format) setGroupFormat(tournament.group_format);
+      if (tournament.same_group_match_frequency !== undefined) setSameGroupFreq(tournament.same_group_match_frequency);
+      if (tournament.other_group_match_frequency !== undefined) setOtherGroupFreq(tournament.other_group_match_frequency);
+      if (tournament.qualification_method) setQualMethod(tournament.qualification_method);
+      if (tournament.custom_qualify_group_a !== undefined) setCustomA(tournament.custom_qualify_group_a);
+      if (tournament.custom_qualify_group_b !== undefined) setCustomB(tournament.custom_qualify_group_b);
+    }
+  }, [tournament]);
+
+  // Sync with context players only if user hasn't made dirty edits
+  React.useEffect(() => {
+    if (players.length > 0 && !isUserDirty.current) {
+      setWizardPlayers([...players]);
+      setNumPlayersInput(players.length);
     }
   }, [players]);
+
+  // Debounced auto-save: whenever wizardPlayers, tournamentName, or groupFormat changes (and only after user started editing)
+  React.useEffect(() => {
+    if (!isUserDirty.current) return;
+
+    const timer = setTimeout(() => {
+      const finalPlayers = wizardPlayers.map((p, idx) => buildCleanPlayer(p, idx, groupFormat));
+
+      const tourUpdates: Partial<Tournament> = {
+        tournament_name: tournamentName.trim() || tournament.tournament_name,
+        group_format: groupFormat,
+        win_points: winPoints,
+        draw_points: drawPoints,
+        loss_points: lossPoints,
+        same_group_match_frequency: sameGroupFreq,
+        other_group_match_frequency: otherGroupFreq,
+        qualification_method: qualMethod,
+      };
+      if (groupFormat === 'TWO_GROUPS' && qualMethod === 'TWO_GROUPS_CUSTOM') {
+        if (customA !== undefined) tourUpdates.custom_qualify_group_a = customA;
+        if (customB !== undefined) tourUpdates.custom_qualify_group_b = customB;
+      }
+
+      saveTournamentAndPlayers(tourUpdates, finalPlayers);
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, [
+    wizardPlayers,
+    tournamentName,
+    groupFormat,
+    winPoints,
+    drawPoints,
+    lossPoints,
+    sameGroupFreq,
+    otherGroupFreq,
+    qualMethod,
+    customA,
+    customB,
+    tournament.tournament_name,
+    saveTournamentAndPlayers
+  ]);
+
+  // Step 1 Save handler
+  const handleSaveStep1 = () => {
+    updateTournament({
+      tournament_name: tournamentName.trim() || 'eFootball Championship 2026',
+      win_points: winPoints,
+      draw_points: drawPoints,
+      loss_points: lossPoints,
+    });
+    setStatusAlert({ type: 'success', text: 'Tournament info saved.' });
+    setTimeout(() => setStatusAlert(null), 2500);
+  };
+
+  // Step 2 Roster Save handler
+  const handleSaveRoster = (): boolean => {
+    const validPlayers = wizardPlayers.filter(p => p.player_name.trim().length > 0);
+    if (validPlayers.length < 2) {
+      setStatusAlert({ type: 'error', text: 'Please ensure at least 2 players have valid names.' });
+      return false;
+    }
+    const finalPlayers = validPlayers.map((p, idx) => buildCleanPlayer(p, idx, groupFormat));
+    setWizardPlayers(finalPlayers);
+    saveTournamentAndPlayers(
+      { tournament_name: tournamentName.trim() || tournament.tournament_name },
+      finalPlayers
+    );
+    setStatusAlert({ type: 'success', text: `✅ Roster saved successfully (${finalPlayers.length} players registered)!` });
+    setTimeout(() => setStatusAlert(null), 3500);
+    return true;
+  };
+
+  // Step 3 Group Format Save handler
+  const handleSaveStep3 = () => {
+    const updatedPlayers = wizardPlayers.map((p, idx) => buildCleanPlayer(p, idx, groupFormat));
+    setWizardPlayers(updatedPlayers);
+    saveTournamentAndPlayers({ group_format: groupFormat }, updatedPlayers);
+    setStatusAlert({ type: 'success', text: 'Group format saved.' });
+    setTimeout(() => setStatusAlert(null), 2500);
+  };
+
+  // Step 4 Frequency Save handler
+  const handleSaveStep4 = () => {
+    updateTournament({
+      same_group_match_frequency: sameGroupFreq,
+      other_group_match_frequency: otherGroupFreq,
+      qualification_method: qualMethod,
+      custom_qualify_group_a: customA,
+      custom_qualify_group_b: customB,
+    });
+    setStatusAlert({ type: 'success', text: 'Match frequency saved.' });
+    setTimeout(() => setStatusAlert(null), 2500);
+  };
+
+  // Save full tournament in SETUP draft state (without generating fixtures)
+  const handleSaveSetupDraft = () => {
+    const validPlayers = wizardPlayers.filter(p => p.player_name.trim().length > 0);
+    const finalPlayers = validPlayers.map((p, idx) => buildCleanPlayer(p, idx, groupFormat));
+
+    const updatedTour: Partial<Tournament> = {
+      tournament_name: tournamentName.trim() || 'eFootball Championship 2026',
+      group_format: groupFormat,
+      same_group_match_frequency: sameGroupFreq,
+      other_group_match_frequency: otherGroupFreq,
+      qualification_method: qualMethod,
+      win_points: winPoints,
+      draw_points: drawPoints,
+      loss_points: lossPoints,
+      status: 'SETUP' as const,
+    };
+    if (groupFormat === 'TWO_GROUPS' && qualMethod === 'TWO_GROUPS_CUSTOM') {
+      if (customA !== undefined) updatedTour.custom_qualify_group_a = customA;
+      if (customB !== undefined) updatedTour.custom_qualify_group_b = customB;
+    }
+
+    setWizardPlayers(finalPlayers);
+    saveTournamentAndPlayers(updatedTour, finalPlayers);
+    setStatusAlert({
+      type: 'success',
+      text: `✅ Tournament setup & roster saved (${finalPlayers.length} players)! You can generate fixtures now or anytime later.`
+    });
+  };
 
   // Synchronize dynamic player list based on number input
   const handleGeneratePlayerInputs = (count: number) => {
@@ -98,13 +253,16 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
     if (updated.length < target) {
       for (let i = updated.length; i < target; i++) {
         const id = `p_${Date.now()}_${i + 1}`;
-        updated.push({
+        const newP: Player = {
           id,
           tournament_id: tournament.id,
           player_name: `Player ${String.fromCharCode(65 + (i % 26))}${i >= 26 ? Math.floor(i / 26) : ''}`,
-          group_name: groupFormat === 'TWO_GROUPS' ? (i % 2 === 0 ? 'Group A' : 'Group B') : undefined,
           created_at: new Date().toISOString(),
-        });
+        };
+        if (groupFormat === 'TWO_GROUPS') {
+          newP.group_name = i % 2 === 0 ? 'Group A' : 'Group B';
+        }
+        updated.push(newP);
       }
     } else if (updated.length > target) {
       updated.splice(target);
@@ -164,26 +322,25 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
 
   // Generation handler
   const executeFixtureGeneration = () => {
-    const finalPlayers = wizardPlayers.map((p, idx) => ({
-      ...p,
-      group_name: groupFormat === 'TWO_GROUPS' ? (p.group_name || (idx % 2 === 0 ? 'Group A' : 'Group B')) : undefined,
-    }));
+    const finalPlayers = wizardPlayers.map((p, idx) => buildCleanPlayer(p, idx, groupFormat));
 
     // Save tournament settings
-    const updatedTour = {
+    const updatedTour: Tournament = {
       ...tournament,
-      tournament_name: tournamentName,
+      tournament_name: tournamentName.trim() || tournament.tournament_name || 'eFootball Championship 2026',
       group_format: groupFormat,
       same_group_match_frequency: sameGroupFreq,
       other_group_match_frequency: otherGroupFreq,
       qualification_method: qualMethod,
-      custom_qualify_group_a: customA,
-      custom_qualify_group_b: customB,
       win_points: winPoints,
       draw_points: drawPoints,
       loss_points: lossPoints,
       status: 'LEAGUE' as const,
     };
+    if (groupFormat === 'TWO_GROUPS' && qualMethod === 'TWO_GROUPS_CUSTOM') {
+      if (customA !== undefined) updatedTour.custom_qualify_group_a = customA;
+      if (customB !== undefined) updatedTour.custom_qualify_group_b = customB;
+    }
 
     const res = generateTournamentFixtures(updatedTour, finalPlayers);
     if (res.success) {
@@ -377,7 +534,10 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
 
           <div className="pt-4 flex justify-end">
             <button
-              onClick={() => setActiveStep(2)}
+              onClick={() => {
+                handleSaveStep1();
+                setActiveStep(2);
+              }}
               className="px-6 py-2.5 rounded-xl bg-[#1d6bf3] hover:bg-[#1557c0] text-white font-bold text-sm flex items-center gap-2 shadow-md transition-all hover:scale-105 active:scale-95"
             >
               <span>Next: Player Registration</span>
@@ -398,22 +558,33 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
               </p>
             </div>
 
-            {/* Dynamic Player Count Selector */}
-            <div className="flex items-center gap-2 bg-slate-100 p-2 rounded-2xl border border-slate-200">
-              <span className="text-xs font-bold text-slate-700">Total Players:</span>
-              <input
-                type="number"
-                min="2"
-                max="64"
-                value={numPlayersInput}
-                onChange={(e) => handleGeneratePlayerInputs(parseInt(e.target.value) || 2)}
-                className="w-16 px-2 py-1 text-center font-display font-bold text-sm bg-white border border-slate-300 rounded-lg text-[#1d6bf3] focus:outline-none focus:ring-2 focus:ring-[#1d6bf3]/30"
-              />
+            {/* Dynamic Player Count Selector & Save Roster */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2 bg-slate-100 p-2 rounded-2xl border border-slate-200">
+                <span className="text-xs font-bold text-slate-700">Total Players:</span>
+                <input
+                  type="number"
+                  min="2"
+                  max="64"
+                  value={numPlayersInput}
+                  onChange={(e) => handleGeneratePlayerInputs(parseInt(e.target.value) || 2)}
+                  className="w-16 px-2 py-1 text-center font-display font-bold text-sm bg-white border border-slate-300 rounded-lg text-[#1d6bf3] focus:outline-none focus:ring-2 focus:ring-[#1d6bf3]/30"
+                />
+                <button
+                  onClick={() => handleGeneratePlayerInputs(numPlayersInput)}
+                  className="px-3 py-1 bg-[#1d6bf3] text-white text-xs font-bold rounded-lg hover:bg-[#1557c0] transition-colors"
+                >
+                  Apply
+                </button>
+              </div>
+
               <button
-                onClick={() => handleGeneratePlayerInputs(numPlayersInput)}
-                className="px-3 py-1 bg-[#1d6bf3] text-white text-xs font-bold rounded-lg hover:bg-[#1557c0] transition-colors"
+                type="button"
+                onClick={handleSaveRoster}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-2xl shadow-sm transition-all flex items-center gap-1.5 active:scale-95 min-h-[40px]"
               >
-                Apply
+                <Save className="w-4 h-4" />
+                <span>Save Roster</span>
               </button>
             </div>
           </div>
@@ -459,7 +630,10 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
 
                 {player.player_photo && (
                   <button
-                    onClick={() => setWizardPlayers(prev => prev.map(p => p.id === player.id ? { ...p, player_photo: undefined } : p))}
+                    onClick={() => {
+                      isUserDirty.current = true;
+                      setWizardPlayers(prev => prev.map(p => p.id === player.id ? { ...p, player_photo: undefined } : p));
+                    }}
                     title="Remove Photo"
                     className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 text-xs"
                   >
@@ -485,13 +659,26 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
             >
               Back
             </button>
-            <button
-              onClick={() => setActiveStep(3)}
-              className="px-6 py-2.5 rounded-xl bg-[#1d6bf3] hover:bg-[#1557c0] text-white font-bold text-sm flex items-center gap-2 shadow-md transition-all hover:scale-105 active:scale-95"
-            >
-              <span>Next: Group Format</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={handleSaveRoster}
+                className="px-4 py-2.5 rounded-xl border border-emerald-600/30 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-colors"
+              >
+                <Save className="w-4 h-4 text-emerald-600" />
+                <span>Save Roster</span>
+              </button>
+              <button
+                onClick={() => {
+                  handleSaveRoster();
+                  setActiveStep(3);
+                }}
+                className="px-6 py-2.5 rounded-xl bg-[#1d6bf3] hover:bg-[#1557c0] text-white font-bold text-sm flex items-center gap-2 shadow-md transition-all hover:scale-105 active:scale-95"
+              >
+                <span>Next: Group Format</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -507,8 +694,12 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div
               onClick={() => {
+                isUserDirty.current = true;
                 setGroupFormat('SINGLE');
-                setWizardPlayers(prev => prev.map(p => ({ ...p, group_name: undefined })));
+                setWizardPlayers(prev => prev.map(p => {
+                  const { group_name, ...rest } = p;
+                  return rest;
+                }));
               }}
               className={`p-5 rounded-2xl border-2 cursor-pointer transition-all ${
                 groupFormat === 'SINGLE'
@@ -527,6 +718,7 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
 
             <div
               onClick={() => {
+                isUserDirty.current = true;
                 setGroupFormat('TWO_GROUPS');
                 handleAutoDivideGroups();
               }}
@@ -623,7 +815,10 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
               Back
             </button>
             <button
-              onClick={() => setActiveStep(4)}
+              onClick={() => {
+                handleSaveStep3();
+                setActiveStep(4);
+              }}
               className="px-6 py-2.5 rounded-xl bg-[#1d6bf3] hover:bg-[#1557c0] text-white font-bold text-sm flex items-center gap-2 shadow-md transition-all hover:scale-105 active:scale-95"
             >
               <span>Next: Match Frequency</span>
@@ -739,7 +934,10 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
               Back
             </button>
             <button
-              onClick={() => setActiveStep(5)}
+              onClick={() => {
+                handleSaveStep4();
+                setActiveStep(5);
+              }}
               className="px-6 py-2.5 rounded-xl bg-[#1d6bf3] hover:bg-[#1557c0] text-white font-bold text-sm flex items-center gap-2 shadow-md transition-all hover:scale-105 active:scale-95"
             >
               <span>Next: Review & Generate</span>
@@ -840,21 +1038,31 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
             </div>
           )}
 
-          {/* Big Action Button */}
-          <div className="pt-4 flex items-center justify-between border-t border-slate-200">
+          {/* Action Buttons */}
+          <div className="pt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-slate-200">
             <button
               onClick={() => setActiveStep(4)}
               className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-sm font-semibold transition-colors"
             >
               Back
             </button>
-            <button
-              onClick={handleStartGeneration}
-              className="px-8 py-3 rounded-xl bg-[#10b981] hover:bg-[#059669] text-white font-display font-black text-sm sm:text-base shadow-md flex items-center gap-2 transition-all hover:scale-105 active:scale-95"
-            >
-              <Calendar className="w-5 h-5 text-white" />
-              <span>GENERATE TOURNAMENT FIXTURES</span>
-            </button>
+            <div className="flex items-center gap-2.5 flex-wrap justify-end">
+              <button
+                type="button"
+                onClick={handleSaveSetupDraft}
+                className="px-5 py-3 rounded-xl border-2 border-slate-300 hover:border-slate-400 text-slate-700 bg-white hover:bg-slate-50 font-display font-bold text-xs sm:text-sm shadow-xs transition-all flex items-center gap-2"
+              >
+                <Save className="w-4 h-4 text-slate-600" />
+                <span>Save Setup Draft</span>
+              </button>
+              <button
+                onClick={handleStartGeneration}
+                className="px-8 py-3 rounded-xl bg-[#10b981] hover:bg-[#059669] text-white font-display font-black text-sm sm:text-base shadow-md flex items-center gap-2 transition-all hover:scale-105 active:scale-95"
+              >
+                <Calendar className="w-5 h-5 text-white" />
+                <span>GENERATE TOURNAMENT FIXTURES</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

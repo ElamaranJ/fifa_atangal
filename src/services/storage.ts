@@ -421,10 +421,25 @@ export const StorageService = {
           adminPin: pin,
           updatedAt: new Date().toISOString(),
         });
-      } catch {
-        await setDoc(getActiveDocRef(), { adminPin: pin }, { merge: true });
+      } catch (updateErr: any) {
+        try {
+          await setDoc(
+            getActiveDocRef(),
+            {
+              adminPin: pin,
+              updatedAt: new Date().toISOString(),
+            },
+            { merge: true }
+          );
+        } catch (setErr: any) {
+          console.error('[Storage] Failed to persist adminPin to Firestore:', setErr || updateErr);
+          throw new Error(
+            `Failed to persist admin PIN to database: ${setErr?.message || updateErr?.message || 'Unknown Firestore error'}`
+          );
+        }
       }
     }
+    // Written only after Firestore confirms, or directly if Firebase is not configured (local fallback)
     localStorage.setItem(STORAGE_KEYS.ADMIN_PIN, pin);
   },
 

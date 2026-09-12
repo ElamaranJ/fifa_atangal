@@ -16,6 +16,19 @@ export const MatchCard: React.FC<MatchCardProps> = ({ match, onSelect, onEnterSc
   const p1 = players.find(p => p.id === match.player_1);
   const p2 = players.find(p => p.id === match.player_2);
 
+  if (!p1) {
+    console.warn(`[MatchCard] Missing player 1 data for match #${match.match_number} (ID: ${match.player_1})`);
+  }
+  if (!p2) {
+    console.warn(`[MatchCard] Missing player 2 data for match #${match.match_number} (ID: ${match.player_2})`);
+  }
+
+  const fallbackP1 = import.meta.env.DEV ? `Player (${match.player_1 || '1'})` : 'Unknown Player';
+  const fallbackP2 = import.meta.env.DEV ? `Player (${match.player_2 || '2'})` : 'Unknown Player';
+
+  const p1Name = p1?.player_name || fallbackP1;
+  const p2Name = p2?.player_name || fallbackP2;
+
   const isCompleted = match.status === 'COMPLETED';
   const s1 = match.player_1_score ?? 0;
   const s2 = match.player_2_score ?? 0;
@@ -60,14 +73,14 @@ export const MatchCard: React.FC<MatchCardProps> = ({ match, onSelect, onEnterSc
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5 min-w-0 flex-1">
               <PlayerAvatar
-                name={p1?.player_name || 'Player 1'}
+                name={p1Name}
                 photo={p1?.player_photo}
                 size="sm"
                 glow={match.winner_id === match.player_1}
               />
               <div className="min-w-0 flex-1">
                 <h4 className={`text-sm font-bold truncate ${match.winner_id === match.player_1 ? 'text-cyan-300 font-black' : 'text-white'}`}>
-                  {p1?.player_name || 'Player 1'}
+                  {p1Name}
                 </h4>
                 <span className="text-[10px] text-slate-400 block truncate">
                   {tournament.group_format === 'TWO_GROUPS' ? (p1?.group_name || 'Group Stage') : 'League Stage'}
@@ -89,14 +102,14 @@ export const MatchCard: React.FC<MatchCardProps> = ({ match, onSelect, onEnterSc
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5 min-w-0 flex-1">
               <PlayerAvatar
-                name={p2?.player_name || 'Player 2'}
+                name={p2Name}
                 photo={p2?.player_photo}
                 size="sm"
                 glow={match.winner_id === match.player_2}
               />
               <div className="min-w-0 flex-1">
                 <h4 className={`text-sm font-bold truncate ${match.winner_id === match.player_2 ? 'text-cyan-300 font-black' : 'text-white'}`}>
-                  {p2?.player_name || 'Player 2'}
+                  {p2Name}
                 </h4>
                 <span className="text-[10px] text-slate-400 block truncate">
                   {tournament.group_format === 'TWO_GROUPS' ? (p2?.group_name || 'Group Stage') : 'League Stage'}
@@ -123,14 +136,14 @@ export const MatchCard: React.FC<MatchCardProps> = ({ match, onSelect, onEnterSc
           {/* Player 1 */}
           <div className="col-span-2 flex items-center gap-3">
             <PlayerAvatar
-              name={p1?.player_name || 'Player 1'}
+              name={p1Name}
               photo={p1?.player_photo}
               size="md"
               glow={match.winner_id === match.player_1}
             />
             <div className="min-w-0">
               <h4 className={`text-xs sm:text-sm truncate ${match.winner_id === match.player_1 ? 'font-black text-cyan-300' : 'font-bold text-white'}`}>
-                {p1?.player_name || 'Player 1'}
+                {p1Name}
               </h4>
               <span className="text-[10px] text-slate-400 truncate block">
                 {tournament.group_format === 'TWO_GROUPS' ? (p1?.group_name || 'Group Stage') : 'League Stage'}
@@ -164,14 +177,14 @@ export const MatchCard: React.FC<MatchCardProps> = ({ match, onSelect, onEnterSc
           <div className="col-span-2 flex items-center justify-end gap-3 text-right">
             <div className="min-w-0">
               <h4 className={`text-xs sm:text-sm truncate ${match.winner_id === match.player_2 ? 'font-black text-cyan-300' : 'font-bold text-white'}`}>
-                {p2?.player_name || 'Player 2'}
+                {p2Name}
               </h4>
               <span className="text-[10px] text-slate-400 truncate block">
                 {tournament.group_format === 'TWO_GROUPS' ? (p2?.group_name || 'Group Stage') : 'League Stage'}
               </span>
             </div>
             <PlayerAvatar
-              name={p2?.player_name || 'Player 2'}
+              name={p2Name}
               photo={p2?.player_photo}
               size="md"
               glow={match.winner_id === match.player_2}

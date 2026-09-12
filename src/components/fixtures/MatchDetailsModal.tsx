@@ -30,6 +30,19 @@ export const MatchDetailsModal: React.FC<MatchDetailsModalProps> = ({
   const p1 = players.find(p => p.id === match.player_1);
   const p2 = players.find(p => p.id === match.player_2);
 
+  if (!p1) {
+    console.warn(`[MatchDetailsModal] Missing player 1 data for match #${match.match_number} (ID: ${match.player_1})`);
+  }
+  if (!p2) {
+    console.warn(`[MatchDetailsModal] Missing player 2 data for match #${match.match_number} (ID: ${match.player_2})`);
+  }
+
+  const fallbackP1 = import.meta.env.DEV ? `Player (${match.player_1 || '1'})` : 'Unknown Player';
+  const fallbackP2 = import.meta.env.DEV ? `Player (${match.player_2 || '2'})` : 'Unknown Player';
+
+  const p1Name = p1?.player_name || fallbackP1;
+  const p2Name = p2?.player_name || fallbackP2;
+
   const isCompleted = match.status === 'COMPLETED';
   const s1 = match.player_1_score ?? 0;
   const s2 = match.player_2_score ?? 0;
@@ -74,21 +87,21 @@ export const MatchDetailsModal: React.FC<MatchDetailsModalProps> = ({
             {/* Player 1 */}
             <div className="col-span-2 flex flex-col items-center text-center min-w-0">
               <PlayerAvatar
-                name={p1?.player_name || 'Player 1'}
+                name={p1Name}
                 photo={p1?.player_photo}
                 size="lg"
                 className="sm:hidden"
                 glow={match.winner_id === match.player_1}
               />
               <PlayerAvatar
-                name={p1?.player_name || 'Player 1'}
+                name={p1Name}
                 photo={p1?.player_photo}
                 size="xl"
                 className="hidden sm:block"
                 glow={match.winner_id === match.player_1}
               />
               <h4 className="mt-2 sm:mt-3 font-bold text-xs sm:text-base text-slate-900 truncate max-w-full px-1">
-                {p1?.player_name || 'Player 1'}
+                {p1Name}
               </h4>
               <span className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate max-w-full">
                 {tournament.group_format === 'TWO_GROUPS' ? (p1?.group_name || 'Group Stage') : 'League Stage'}
@@ -133,21 +146,21 @@ export const MatchDetailsModal: React.FC<MatchDetailsModalProps> = ({
             {/* Player 2 */}
             <div className="col-span-2 flex flex-col items-center text-center min-w-0">
               <PlayerAvatar
-                name={p2?.player_name || 'Player 2'}
+                name={p2Name}
                 photo={p2?.player_photo}
                 size="lg"
                 className="sm:hidden"
                 glow={match.winner_id === match.player_2}
               />
               <PlayerAvatar
-                name={p2?.player_name || 'Player 2'}
+                name={p2Name}
                 photo={p2?.player_photo}
                 size="xl"
                 className="hidden sm:block"
                 glow={match.winner_id === match.player_2}
               />
               <h4 className="mt-2 sm:mt-3 font-bold text-xs sm:text-base text-slate-900 truncate max-w-full px-1">
-                {p2?.player_name || 'Player 2'}
+                {p2Name}
               </h4>
               <span className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate max-w-full">
                 {tournament.group_format === 'TWO_GROUPS' ? (p2?.group_name || 'Group Stage') : 'League Stage'}

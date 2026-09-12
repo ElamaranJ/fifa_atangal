@@ -74,16 +74,23 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingPlayerId, setUploadingPlayerId] = useState<string | null>(null);
 
-  // Sync with context players if they load asynchronously after mount
+  const hasInitializedFromPlayers = useRef(players.length > 0);
+  const isUserDirty = useRef(false);
+
+  // Sync with context players only once on initial mount if not already loaded, avoiding overwriting in-progress edits
   React.useEffect(() => {
-    if (players.length > 0) {
-      setWizardPlayers([...players]);
-      setNumPlayersInput(players.length);
+    if (!hasInitializedFromPlayers.current && players.length > 0) {
+      hasInitializedFromPlayers.current = true;
+      if (!isUserDirty.current) {
+        setWizardPlayers([...players]);
+        setNumPlayersInput(players.length);
+      }
     }
   }, [players]);
 
   // Synchronize dynamic player list based on number input
   const handleGeneratePlayerInputs = (count: number) => {
+    isUserDirty.current = true;
     const target = Math.max(2, Math.min(64, count));
     setNumPlayersInput(target);
 
@@ -106,10 +113,12 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
   };
 
   const handleUpdatePlayerName = (id: string, name: string) => {
+    isUserDirty.current = true;
     setWizardPlayers(prev => prev.map(p => p.id === id ? { ...p, player_name: name } : p));
   };
 
   const handleToggleGroup = (id: string) => {
+    isUserDirty.current = true;
     setWizardPlayers(prev => prev.map(p => {
       if (p.id !== id) return p;
       return {
@@ -120,6 +129,7 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
   };
 
   const handleAutoDivideGroups = () => {
+    isUserDirty.current = true;
     setWizardPlayers(prev => prev.map((p, idx) => ({
       ...p,
       group_name: idx % 2 === 0 ? 'Group A' : 'Group B',
@@ -127,6 +137,7 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
   };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    isUserDirty.current = true;
     const file = e.target.files?.[0];
     if (!file || !uploadingPlayerId) return;
     try {

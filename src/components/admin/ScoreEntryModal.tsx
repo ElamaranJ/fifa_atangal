@@ -23,6 +23,12 @@ export const ScoreEntryModal: React.FC<ScoreEntryModalProps> = ({ match, isOpen,
   const p1 = players.find(p => p.id === match?.player_1);
   const p2 = players.find(p => p.id === match?.player_2);
 
+  const fallbackP1 = import.meta.env.DEV ? `Player (${match?.player_1 || '1'})` : 'Unknown Player';
+  const fallbackP2 = import.meta.env.DEV ? `Player (${match?.player_2 || '2'})` : 'Unknown Player';
+
+  const p1Name = p1?.player_name || fallbackP1;
+  const p2Name = p2?.player_name || fallbackP2;
+
   useEffect(() => {
     if (match) {
       setS1(match.player_1_score ?? 0);
@@ -123,21 +129,21 @@ export const ScoreEntryModal: React.FC<ScoreEntryModalProps> = ({ match, isOpen,
             {/* Player 1 */}
             <div className="flex flex-col items-center text-center space-y-2 sm:space-y-3 min-w-0">
               <PlayerAvatar
-                name={p1?.player_name || 'Player 1'}
+                name={p1Name}
                 photo={p1?.player_photo}
                 size="md"
                 className="sm:hidden"
                 glow={s1 > s2}
               />
               <PlayerAvatar
-                name={p1?.player_name || 'Player 1'}
+                name={p1Name}
                 photo={p1?.player_photo}
                 size="lg"
                 className="hidden sm:block"
                 glow={s1 > s2}
               />
               <span className="text-xs sm:text-base font-bold text-slate-800 truncate max-w-full px-1">
-                {p1?.player_name || 'Player 1'}
+                {p1Name}
               </span>
               <div className="flex items-center gap-1.5 sm:gap-2">
                 <button
@@ -168,21 +174,21 @@ export const ScoreEntryModal: React.FC<ScoreEntryModalProps> = ({ match, isOpen,
             {/* Player 2 */}
             <div className="flex flex-col items-center text-center space-y-2 sm:space-y-3 min-w-0">
               <PlayerAvatar
-                name={p2?.player_name || 'Player 2'}
+                name={p2Name}
                 photo={p2?.player_photo}
                 size="md"
                 className="sm:hidden"
                 glow={s2 > s1}
               />
               <PlayerAvatar
-                name={p2?.player_name || 'Player 2'}
+                name={p2Name}
                 photo={p2?.player_photo}
                 size="lg"
                 className="hidden sm:block"
                 glow={s2 > s1}
               />
               <span className="text-xs sm:text-base font-bold text-slate-800 truncate max-w-full px-1">
-                {p2?.player_name || 'Player 2'}
+                {p2Name}
               </span>
               <div className="flex items-center gap-1.5 sm:gap-2">
                 <button

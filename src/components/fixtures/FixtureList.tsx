@@ -49,14 +49,36 @@ export const FixtureList: React.FC<FixtureListProps> = ({
       // Player search filter
       if (searchPlayer.trim()) {
         const query = searchPlayer.toLowerCase();
-        const p1 = players.find(p => p.id === m.player_1)?.player_name.toLowerCase() || '';
-        const p2 = players.find(p => p.id === m.player_2)?.player_name.toLowerCase() || '';
+        const p1Obj = players.find(p => p.id === m.player_1);
+        const p2Obj = players.find(p => p.id === m.player_2);
+        if (!p1Obj) {
+          console.warn(`[FixtureList] Match #${m.match_number} references unknown player_1 ID: ${m.player_1}`);
+        }
+        if (!p2Obj) {
+          console.warn(`[FixtureList] Match #${m.match_number} references unknown player_2 ID: ${m.player_2}`);
+        }
+        const p1 = p1Obj?.player_name.toLowerCase() || '';
+        const p2 = p2Obj?.player_name.toLowerCase() || '';
         if (!p1.includes(query) && !p2.includes(query)) return false;
       }
 
       return true;
     });
   }, [matches, players, statusFilter, groupFilter, roundFilter, searchPlayer]);
+
+  // Log warnings on initial load/render if any fixture references missing players
+  React.useEffect(() => {
+    matches.forEach(m => {
+      if (m.stage === 'LEAGUE') {
+        if (!players.some(p => p.id === m.player_1)) {
+          console.warn(`[FixtureList] Match #${m.match_number} references missing player_1 ID: ${m.player_1}`);
+        }
+        if (!players.some(p => p.id === m.player_2)) {
+          console.warn(`[FixtureList] Match #${m.match_number} references missing player_2 ID: ${m.player_2}`);
+        }
+      }
+    });
+  }, [matches, players]);
 
   return (
     <div className="space-y-6">

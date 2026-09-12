@@ -151,7 +151,7 @@ export const PointsTable: React.FC<PointsTableProps> = ({ onSelectPlayer }) => {
                             )}
                           </div>
                           <span className="text-[10px] text-slate-400 font-mono block">
-                            {player.group_name || 'Contender'}
+                            {tournament.group_format === 'TWO_GROUPS' ? (player.group_name || 'Group Stage') : 'League'}
                           </span>
                         </div>
                       </div>
@@ -358,7 +358,7 @@ export const PointsTable: React.FC<PointsTableProps> = ({ onSelectPlayer }) => {
                                 )}
                               </div>
                               <span className="text-[10px] text-slate-400 font-mono block">
-                                {player.group_name || 'Contender'}
+                                {tournament.group_format === 'TWO_GROUPS' ? (player.group_name || 'Group Stage') : 'League'}
                               </span>
                             </div>
                           </div>

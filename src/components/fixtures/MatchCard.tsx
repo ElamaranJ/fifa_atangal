@@ -11,7 +11,7 @@ interface MatchCardProps {
 }
 
 export const MatchCard: React.FC<MatchCardProps> = ({ match, onSelect, onEnterScore }) => {
-  const { players, isAdmin } = useTournament();
+  const { players, isAdmin, tournament } = useTournament();
 
   const p1 = players.find(p => p.id === match.player_1);
   const p2 = players.find(p => p.id === match.player_2);
@@ -67,10 +67,10 @@ export const MatchCard: React.FC<MatchCardProps> = ({ match, onSelect, onEnterSc
               />
               <div className="min-w-0 flex-1">
                 <h4 className={`text-sm font-bold truncate ${match.winner_id === match.player_1 ? 'text-cyan-300 font-black' : 'text-white'}`}>
-                  {p1?.player_name}
+                  {p1?.player_name || 'Player 1'}
                 </h4>
                 <span className="text-[10px] text-slate-400 block truncate">
-                  {p1?.group_name || 'Contender'}
+                  {tournament.group_format === 'TWO_GROUPS' ? (p1?.group_name || 'Group Stage') : 'League Stage'}
                 </span>
               </div>
             </div>
@@ -96,10 +96,10 @@ export const MatchCard: React.FC<MatchCardProps> = ({ match, onSelect, onEnterSc
               />
               <div className="min-w-0 flex-1">
                 <h4 className={`text-sm font-bold truncate ${match.winner_id === match.player_2 ? 'text-cyan-300 font-black' : 'text-white'}`}>
-                  {p2?.player_name}
+                  {p2?.player_name || 'Player 2'}
                 </h4>
                 <span className="text-[10px] text-slate-400 block truncate">
-                  {p2?.group_name || 'Contender'}
+                  {tournament.group_format === 'TWO_GROUPS' ? (p2?.group_name || 'Group Stage') : 'League Stage'}
                 </span>
               </div>
             </div>
@@ -130,10 +130,10 @@ export const MatchCard: React.FC<MatchCardProps> = ({ match, onSelect, onEnterSc
             />
             <div className="min-w-0">
               <h4 className={`text-xs sm:text-sm truncate ${match.winner_id === match.player_1 ? 'font-black text-cyan-300' : 'font-bold text-white'}`}>
-                {p1?.player_name}
+                {p1?.player_name || 'Player 1'}
               </h4>
               <span className="text-[10px] text-slate-400 truncate block">
-                {p1?.group_name || 'Contender'}
+                {tournament.group_format === 'TWO_GROUPS' ? (p1?.group_name || 'Group Stage') : 'League Stage'}
               </span>
             </div>
           </div>
@@ -164,10 +164,10 @@ export const MatchCard: React.FC<MatchCardProps> = ({ match, onSelect, onEnterSc
           <div className="col-span-2 flex items-center justify-end gap-3 text-right">
             <div className="min-w-0">
               <h4 className={`text-xs sm:text-sm truncate ${match.winner_id === match.player_2 ? 'font-black text-cyan-300' : 'font-bold text-white'}`}>
-                {p2?.player_name}
+                {p2?.player_name || 'Player 2'}
               </h4>
               <span className="text-[10px] text-slate-400 truncate block">
-                {p2?.group_name || 'Contender'}
+                {tournament.group_format === 'TWO_GROUPS' ? (p2?.group_name || 'Group Stage') : 'League Stage'}
               </span>
             </div>
             <PlayerAvatar

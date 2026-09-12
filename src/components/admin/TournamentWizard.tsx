@@ -17,14 +17,16 @@ import {
   Upload, 
   ArrowRight,
   ShieldCheck,
-  RotateCcw
+  RotateCcw,
+  KeyRound,
 } from 'lucide-react';
 
 interface TournamentWizardProps {
   onOpenResetModal: () => void;
+  onOpenChangePassword?: () => void;
 }
 
-export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetModal }) => {
+export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetModal, onOpenChangePassword }) => {
   const { 
     tournament, 
     players, 
@@ -36,10 +38,6 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
     setActiveTab,
     isAdmin,
   } = useTournament();
-
-  if (!isAdmin) {
-    return null;
-  }
 
   const [activeStep, setActiveStep] = useState<number>(1);
   const [numPlayersInput, setNumPlayersInput] = useState<number>(players.length || 8);
@@ -55,12 +53,34 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
   const [customA, setCustomA] = useState<number>(tournament.custom_qualify_group_a ?? 2);
   const [customB, setCustomB] = useState<number>(tournament.custom_qualify_group_b ?? 2);
 
-  const [wizardPlayers, setWizardPlayers] = useState<Player[]>([...players]);
+  const [wizardPlayers, setWizardPlayers] = useState<Player[]>(() => {
+    if (players.length > 0) return [...players];
+    const initial: Player[] = [];
+    for (let i = 0; i < 8; i++) {
+      initial.push({
+        id: `p_${Date.now()}_${i + 1}`,
+        tournament_id: tournament.id,
+        player_name: `Player ${String.fromCharCode(65 + i)}`,
+        group_name: tournament.group_format === 'TWO_GROUPS' ? (i % 2 === 0 ? 'Group A' : 'Group B') : undefined,
+        created_at: new Date().toISOString(),
+      });
+    }
+    return initial;
+  });
+
   const [statusAlert, setStatusAlert] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
   const [confirmRegenerateModal, setConfirmRegenerateModal] = useState<boolean>(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingPlayerId, setUploadingPlayerId] = useState<string | null>(null);
+
+  // Sync with context players if they load asynchronously after mount
+  React.useEffect(() => {
+    if (players.length > 0) {
+      setWizardPlayers([...players]);
+      setNumPlayersInput(players.length);
+    }
+  }, [players]);
 
   // Synchronize dynamic player list based on number input
   const handleGeneratePlayerInputs = (count: number) => {
@@ -133,6 +153,11 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
 
   // Generation handler
   const executeFixtureGeneration = () => {
+    const finalPlayers = wizardPlayers.map((p, idx) => ({
+      ...p,
+      group_name: groupFormat === 'TWO_GROUPS' ? (p.group_name || (idx % 2 === 0 ? 'Group A' : 'Group B')) : undefined,
+    }));
+
     // Save tournament settings
     const updatedTour = {
       ...tournament,
@@ -146,16 +171,15 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
       win_points: winPoints,
       draw_points: drawPoints,
       loss_points: lossPoints,
+      status: 'LEAGUE' as const,
     };
-    updateTournament(updatedTour);
-    setPlayersList(wizardPlayers);
 
-    const res = generateTournamentFixtures(updatedTour, wizardPlayers);
+    const res = generateTournamentFixtures(updatedTour, finalPlayers);
     if (res.success) {
       setStatusAlert({ type: 'success', text: 'Fixtures generated successfully! Redirecting to Fixtures...' });
       setTimeout(() => {
         setActiveTab('fixtures');
-      }, 1000);
+      }, 800);
     } else {
       setStatusAlert({ type: 'error', text: res.error || 'Failed to generate fixtures' });
     }
@@ -196,6 +220,10 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
     { num: 5, title: 'Review & Generate', icon: Calendar },
   ];
 
+  if (!isAdmin) {
+    return null;
+  }
+
   return (
     <div className="space-y-6">
       
@@ -212,13 +240,24 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
         </div>
 
         {isAdmin && (
-          <button
-            onClick={onOpenResetModal}
-            className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold flex items-center gap-2 shadow-md transition-all self-start md:self-auto active:scale-95 border-0"
-          >
-            <RotateCcw className="w-4 h-4 text-white" />
-            <span>Reset Tournament</span>
-          </button>
+          <div className="flex items-center gap-2 flex-wrap self-start md:self-auto">
+            {onOpenChangePassword && (
+              <button
+                onClick={onOpenChangePassword}
+                className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-2 shadow-md transition-all active:scale-95 border-0"
+              >
+                <KeyRound className="w-4 h-4 text-amber-400" />
+                <span>Change Password</span>
+              </button>
+            )}
+            <button
+              onClick={onOpenResetModal}
+              className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold flex items-center gap-2 shadow-md transition-all active:scale-95 border-0"
+            >
+              <RotateCcw className="w-4 h-4 text-white" />
+              <span>Reset Tournament</span>
+            </button>
+          </div>
         )}
       </div>
 
@@ -456,7 +495,10 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div
-              onClick={() => setGroupFormat('SINGLE')}
+              onClick={() => {
+                setGroupFormat('SINGLE');
+                setWizardPlayers(prev => prev.map(p => ({ ...p, group_name: undefined })));
+              }}
               className={`p-5 rounded-2xl border-2 cursor-pointer transition-all ${
                 groupFormat === 'SINGLE'
                   ? 'border-[#1d6bf3] bg-blue-50/70 shadow-sm'

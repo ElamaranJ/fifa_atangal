@@ -88,10 +88,10 @@ export const MatchDetailsModal: React.FC<MatchDetailsModalProps> = ({
                 glow={match.winner_id === match.player_1}
               />
               <h4 className="mt-2 sm:mt-3 font-bold text-xs sm:text-base text-slate-900 truncate max-w-full px-1">
-                {p1?.player_name}
+                {p1?.player_name || 'Player 1'}
               </h4>
               <span className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate max-w-full">
-                {p1?.group_name || 'Competitor'}
+                {tournament.group_format === 'TWO_GROUPS' ? (p1?.group_name || 'Group Stage') : 'League Stage'}
               </span>
               {match.winner_id === match.player_1 && (
                 <span className="mt-1 text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-bold">
@@ -147,10 +147,10 @@ export const MatchDetailsModal: React.FC<MatchDetailsModalProps> = ({
                 glow={match.winner_id === match.player_2}
               />
               <h4 className="mt-2 sm:mt-3 font-bold text-xs sm:text-base text-slate-900 truncate max-w-full px-1">
-                {p2?.player_name}
+                {p2?.player_name || 'Player 2'}
               </h4>
               <span className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate max-w-full">
-                {p2?.group_name || 'Competitor'}
+                {tournament.group_format === 'TWO_GROUPS' ? (p2?.group_name || 'Group Stage') : 'League Stage'}
               </span>
               {match.winner_id === match.player_2 && (
                 <span className="mt-1 text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-bold">

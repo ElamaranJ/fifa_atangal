@@ -6,11 +6,13 @@ import {
   PlayoffBracketData, 
   PlayerStatistics, 
   DynamicTournamentStats,
+  TournamentRulesData,
 } from '../types/tournament';
 import { StorageService, DEFAULT_ADMIN_PIN, TournamentFirestoreDoc } from '../services/storage';
 import { recalculateTournamentState } from '../services/statsCalculator';
 import { generateFixtures } from '../services/fixtureGenerator';
 import { INITIAL_EMPTY_TOURNAMENT, DEMO_TOURNAMENT_ID } from '../data/demoTournament';
+import { DEFAULT_TOURNAMENT_RULES } from '../data/defaultRules';
 import { sounds } from '../services/soundEffects';
 
 interface TournamentContextType {
@@ -18,6 +20,9 @@ interface TournamentContextType {
   players: Player[];
   matches: Match[];
   playoffs: PlayoffBracketData;
+  rules: TournamentRulesData;
+  updateRules: (newRules: TournamentRulesData) => Promise<void>;
+  resetRulesToDefault: () => Promise<void>;
   overallStats: PlayerStatistics[];
   groupAStats: PlayerStatistics[];
   groupBStats: PlayerStatistics[];
@@ -32,6 +37,7 @@ interface TournamentContextType {
   setIsAdmin: (status: boolean) => void;
   loginAdmin: (pin: string) => boolean;
   logoutAdmin: () => void;
+  changeAdminPassword: (currentPin: string, newPin: string) => Promise<{ success: boolean; error?: string }>;
   updateTournament: (updates: Partial<Tournament>) => void;
   addPlayer: (name: string, photo?: string, group?: string) => void;
   updatePlayer: (id: string, updates: Partial<Player>) => void;
@@ -67,7 +73,16 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [players, setPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [playoffs, setPlayoffs] = useState<PlayoffBracketData>({});
-  const [adminPin, setAdminPin] = useState<string>(DEFAULT_ADMIN_PIN);
+  const [rules, setRules] = useState<TournamentRulesData>(() => {
+    try {
+      const saved = localStorage.getItem('efootball_rules_data');
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // fallback
+    }
+    return DEFAULT_TOURNAMENT_RULES;
+  });
+  const [adminPin, setAdminPin] = useState<string>(() => localStorage.getItem('efootball_admin_pin') || DEFAULT_ADMIN_PIN);
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'offline' | 'error'>('syncing');
@@ -148,6 +163,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           if (Array.isArray(data.players)) setPlayers(data.players);
           if (Array.isArray(data.matches)) setMatches(data.matches);
           if (data.playoffs) setPlayoffs(data.playoffs);
+          if (data.rules) setRules(data.rules);
           if (data.adminPin) setAdminPin(data.adminPin);
 
           setTimeout(() => {
@@ -233,13 +249,35 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, []);
 
   const loginAdmin = useCallback((pin: string): boolean => {
-    if (pin === adminPin || pin === DEFAULT_ADMIN_PIN || pin === 'rmdec@123') {
+    const inputPin = pin.trim();
+    if (inputPin === adminPin || (adminPin === DEFAULT_ADMIN_PIN && (inputPin === DEFAULT_ADMIN_PIN || inputPin === 'rmdec@123'))) {
       setIsAdmin(true);
       StorageService.setAdminLoggedIn(true);
       return true;
     }
     return false;
   }, [adminPin]);
+
+  const changeAdminPassword = useCallback(async (currentPin: string, newPin: string): Promise<{ success: boolean; error?: string }> => {
+    if (!isAdmin) {
+      return { success: false, error: 'Admin authorization required.' };
+    }
+    if (currentPin.trim() !== adminPin.trim()) {
+      return { success: false, error: 'Current password is incorrect.' };
+    }
+    if (!newPin || newPin.trim().length < 4) {
+      return { success: false, error: 'New password must be at least 4 characters long.' };
+    }
+    const cleanPin = newPin.trim();
+    setAdminPin(cleanPin);
+    try {
+      await StorageService.setAdminPin(cleanPin);
+      return { success: true };
+    } catch (err: any) {
+      console.error('[Storage] Error updating admin password:', err);
+      return { success: false, error: err?.message || 'Failed to update password' };
+    }
+  }, [isAdmin, adminPin]);
 
   const logoutAdmin = useCallback(() => {
     setIsAdmin(false);
@@ -293,6 +331,9 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       return;
     }
     setPlayers(newPlayers);
+    StorageService.saveTournamentState({ players: newPlayers }).catch(err =>
+      console.error('[Storage] Save players list error:', err)
+    );
   }, [isAdmin]);
 
   // Update previous rank map before score changes to show rank shifts
@@ -336,9 +377,25 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       activeTournament.other_group_match_frequency
     );
 
+    const updatedTour: Tournament = {
+      ...tournament,
+      ...activeTournament,
+      status: 'LEAGUE',
+    };
+
+    setPlayers(activePlayers);
     setMatches(generated);
     setPlayoffs({});
-    setTournament(prev => ({ ...prev, ...activeTournament, status: 'LEAGUE' }));
+    setTournament(updatedTour);
+
+    // Save atomically so Firestore snapshot cannot receive partial/out-of-order updates
+    StorageService.saveTournamentState({
+      tournament: updatedTour,
+      players: activePlayers,
+      matches: generated,
+      playoffs: {},
+    }).catch(err => console.error('[Storage] Fixture generation save error:', err));
+
     return { success: true };
   }, [isAdmin, players, tournament]);
 
@@ -683,6 +740,16 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return { success: true };
   }, [isAdmin, setActiveTab]);
 
+  const updateRules = useCallback(async (newRules: TournamentRulesData) => {
+    setRules(newRules);
+    await StorageService.saveRules(newRules);
+  }, []);
+
+  const resetRulesToDefault = useCallback(async () => {
+    setRules(DEFAULT_TOURNAMENT_RULES);
+    await StorageService.saveRules(DEFAULT_TOURNAMENT_RULES);
+  }, []);
+
   return (
     <TournamentContext.Provider
       value={{
@@ -690,6 +757,9 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         players,
         matches,
         playoffs,
+        rules,
+        updateRules,
+        resetRulesToDefault,
         overallStats,
         groupAStats,
         groupBStats,
@@ -703,6 +773,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setIsAdmin,
         loginAdmin,
         logoutAdmin,
+        changeAdminPassword,
         updateTournament,
         addPlayer,
         updatePlayer,

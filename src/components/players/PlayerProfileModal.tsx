@@ -22,7 +22,8 @@ export const PlayerProfileModal: React.FC = () => {
     matches, 
     players, 
     isAdmin, 
-    updatePlayer 
+    updatePlayer,
+    tournament,
   } = useTournament();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -120,7 +121,7 @@ export const PlayerProfileModal: React.FC = () => {
             </div>
 
             <p className="text-xs text-slate-400 font-mono mb-2 sm:mb-3">
-              {player.group_name || 'League Contender'} • Rank #{player.rank}
+              {tournament.group_format === 'TWO_GROUPS' ? (player.group_name || 'Group Stage') : 'League Stage'} • Rank #{player.rank}
             </p>
 
             {/* Form dots */}

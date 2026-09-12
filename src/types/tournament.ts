@@ -122,3 +122,23 @@ export interface TournamentBackup {
   matches: Match[];
   playoffs: PlayoffBracketData;
 }
+
+export type RuleCategory = 'home' | 'college' | 'general';
+export type RuleSeverity = 'critical' | 'warning' | 'info' | 'success';
+
+export interface TournamentRuleItem {
+  id: string;
+  category: RuleCategory;
+  title: string;
+  description: string;
+  badge?: string;
+  severity: RuleSeverity;
+  isHighlighted?: boolean;
+}
+
+export interface TournamentRulesData {
+  lastUpdated?: string;
+  homeRules: TournamentRuleItem[];
+  collegeRules: TournamentRuleItem[];
+  generalNotice?: string;
+}

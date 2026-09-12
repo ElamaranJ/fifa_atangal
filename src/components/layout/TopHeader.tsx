@@ -1,10 +1,11 @@
 import React from 'react';
 import { useTournament } from '../../context/TournamentContext';
-import { Search, Sun, VolumeX, Lock, Unlock, User, Menu, RotateCcw } from 'lucide-react';
+import { Search, Sun, VolumeX, Lock, Unlock, User, Menu, RotateCcw, KeyRound } from 'lucide-react';
 
 interface TopHeaderProps {
   onOpenAdminLogin: () => void;
   onOpenResetModal?: () => void;
+  onOpenChangePassword?: () => void;
   onToggleMobileSidebar: () => void;
   searchQuery: string;
   onSearchChange: (q: string) => void;
@@ -13,6 +14,7 @@ interface TopHeaderProps {
 export const TopHeader: React.FC<TopHeaderProps> = ({
   onOpenAdminLogin,
   onOpenResetModal,
+  onOpenChangePassword,
   onToggleMobileSidebar,
   searchQuery,
   onSearchChange,
@@ -68,6 +70,19 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         >
           {isAudioMuted ? <VolumeX className="w-4 h-4 text-slate-400" /> : <Sun className="w-4 h-4 text-amber-500" />}
         </button>
+
+        {/* Change Password Option for Admin */}
+        {isAdmin && onOpenChangePassword && (
+          <button
+            onClick={onOpenChangePassword}
+            title="Change Admin Password"
+            aria-label="Change Admin Password"
+            className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-full bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs shadow-md transition-all active:scale-95 min-h-[38px] sm:min-h-[40px] shrink-0"
+          >
+            <KeyRound className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden sm:inline">Password</span>
+          </button>
+        )}
 
         {/* Reset Option for Admin - ONLY visible when admin is logged in */}
         {isAdmin && onOpenResetModal && (

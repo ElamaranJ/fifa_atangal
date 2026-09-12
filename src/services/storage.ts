@@ -3,8 +3,10 @@ import {
   Player, 
   Match, 
   PlayoffBracketData, 
-  TournamentBackup 
+  TournamentBackup,
+  TournamentRulesData
 } from '../types/tournament';
+import { DEFAULT_TOURNAMENT_RULES } from '../data/defaultRules';
 import { db, isFirebaseConfigured } from './firebaseConfig';
 import { 
   doc, 
@@ -20,6 +22,7 @@ export interface TournamentFirestoreDoc {
   players: Player[];
   matches: Match[];
   playoffs: PlayoffBracketData;
+  rules?: TournamentRulesData;
   adminPin?: string;
   updatedAt: string;
 }
@@ -32,6 +35,7 @@ const STORAGE_KEYS = {
   PLAYERS: 'efootball_players_data',
   MATCHES: 'efootball_matches_data',
   PLAYOFFS: 'efootball_playoffs_data',
+  RULES: 'efootball_rules_data',
   ADMIN_PIN: 'efootball_admin_pin',
   ADMIN_AUTH: 'efootball_admin_logged_in',
 };
@@ -207,6 +211,53 @@ export const StorageService = {
     return this.loadAllLocal();
   },
 
+  /**
+   * Atomically saves multiple tournament fields to Firestore / localStorage
+   * in a single updateDoc / write operation to prevent race conditions in onSnapshot listeners.
+   */
+  async saveTournamentState(state: {
+    tournament?: Tournament;
+    players?: Player[];
+    matches?: Match[];
+    playoffs?: PlayoffBracketData;
+    rules?: TournamentRulesData;
+  }): Promise<void> {
+    const payload: Record<string, any> = {
+      updatedAt: new Date().toISOString(),
+    };
+    if (state.tournament !== undefined) payload.tournament = state.tournament;
+    if (state.players !== undefined) payload.players = state.players;
+    if (state.matches !== undefined) payload.matches = state.matches;
+    if (state.playoffs !== undefined) payload.playoffs = state.playoffs;
+    if (state.rules !== undefined) payload.rules = state.rules;
+
+    if (isFirebaseConfigured && db) {
+      try {
+        await updateDoc(getActiveDocRef(), payload);
+        return;
+      } catch {
+        await setDoc(getActiveDocRef(), payload, { merge: true });
+        return;
+      }
+    }
+
+    if (state.tournament !== undefined) {
+      localStorage.setItem(STORAGE_KEYS.TOURNAMENT, JSON.stringify(state.tournament));
+    }
+    if (state.players !== undefined) {
+      localStorage.setItem(STORAGE_KEYS.PLAYERS, JSON.stringify(state.players));
+    }
+    if (state.matches !== undefined) {
+      localStorage.setItem(STORAGE_KEYS.MATCHES, JSON.stringify(state.matches));
+    }
+    if (state.playoffs !== undefined) {
+      localStorage.setItem(STORAGE_KEYS.PLAYOFFS, JSON.stringify(state.playoffs));
+    }
+    if (state.rules !== undefined) {
+      localStorage.setItem(STORAGE_KEYS.RULES, JSON.stringify(state.rules));
+    }
+  },
+
   async saveTournament(tournament: Tournament): Promise<void> {
     if (isFirebaseConfigured && db) {
       try {
@@ -302,6 +353,41 @@ export const StorageService = {
   async loadPlayoffs(): Promise<PlayoffBracketData> {
     const docData = await this.loadTournamentDoc();
     return docData ? docData.playoffs : {};
+  },
+
+  async saveRules(rules: TournamentRulesData): Promise<void> {
+    if (isFirebaseConfigured && db) {
+      try {
+        await updateDoc(getActiveDocRef(), {
+          rules,
+          updatedAt: new Date().toISOString(),
+        });
+        return;
+      } catch {
+        await setDoc(getActiveDocRef(), {
+          rules,
+          updatedAt: new Date().toISOString(),
+        }, { merge: true });
+        return;
+      }
+    }
+    localStorage.setItem(STORAGE_KEYS.RULES, JSON.stringify(rules));
+  },
+
+  async loadRules(): Promise<TournamentRulesData> {
+    const docData = await this.loadTournamentDoc();
+    if (docData?.rules) {
+      return docData.rules;
+    }
+    const local = localStorage.getItem(STORAGE_KEYS.RULES);
+    if (local) {
+      try {
+        return JSON.parse(local);
+      } catch {
+        // fallback
+      }
+    }
+    return DEFAULT_TOURNAMENT_RULES;
   },
 
   /**
@@ -446,11 +532,13 @@ export const StorageService = {
     const tData = localStorage.getItem(STORAGE_KEYS.TOURNAMENT);
     if (!tData) return null;
     try {
+      const rawRules = localStorage.getItem(STORAGE_KEYS.RULES);
       return {
         tournament: JSON.parse(tData),
         players: JSON.parse(localStorage.getItem(STORAGE_KEYS.PLAYERS) || '[]'),
         matches: JSON.parse(localStorage.getItem(STORAGE_KEYS.MATCHES) || '[]'),
         playoffs: JSON.parse(localStorage.getItem(STORAGE_KEYS.PLAYOFFS) || '{}'),
+        rules: rawRules ? JSON.parse(rawRules) : DEFAULT_TOURNAMENT_RULES,
         adminPin: localStorage.getItem(STORAGE_KEYS.ADMIN_PIN) || DEFAULT_ADMIN_PIN,
         updatedAt: new Date().toISOString(),
       };
@@ -464,6 +552,9 @@ export const StorageService = {
     localStorage.setItem(STORAGE_KEYS.PLAYERS, JSON.stringify(data.players));
     localStorage.setItem(STORAGE_KEYS.MATCHES, JSON.stringify(data.matches));
     localStorage.setItem(STORAGE_KEYS.PLAYOFFS, JSON.stringify(data.playoffs));
+    if (data.rules) {
+      localStorage.setItem(STORAGE_KEYS.RULES, JSON.stringify(data.rules));
+    }
     if (data.adminPin) {
       localStorage.setItem(STORAGE_KEYS.ADMIN_PIN, data.adminPin);
     }

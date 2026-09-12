@@ -9,7 +9,7 @@ interface GoldenBootProps {
 }
 
 export const GoldenBoot: React.FC<GoldenBootProps> = ({ onSelectPlayer }) => {
-  const { goldenBootLeaders } = useTournament();
+  const { goldenBootLeaders, tournament } = useTournament();
 
   const leader = goldenBootLeaders[0];
   const isJointLeader = leader && leader.is_joint_golden_boot;
@@ -169,7 +169,7 @@ export const GoldenBoot: React.FC<GoldenBootProps> = ({ onSelectPlayer }) => {
                             {player.player_name}
                           </span>
                           <span className="text-[10px] text-slate-400 font-mono block">
-                            {player.group_name || 'Competitor'}
+                            {tournament.group_format === 'TWO_GROUPS' ? (player.group_name || 'Group Stage') : 'League Stage'}
                           </span>
                         </div>
                       </div>

@@ -12,16 +12,24 @@ import {
   Lock,
   Unlock,
   X,
-  RotateCcw
+  RotateCcw,
+  KeyRound,
+  ScrollText
 } from 'lucide-react';
 
 interface SidebarProps {
   onOpenAdminLogin: () => void;
   onOpenResetModal?: () => void;
+  onOpenChangePassword?: () => void;
   onNavigate?: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ onOpenAdminLogin, onOpenResetModal, onNavigate }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ 
+  onOpenAdminLogin, 
+  onOpenResetModal, 
+  onOpenChangePassword,
+  onNavigate 
+}) => {
   const { activeTab, setActiveTab, isAdmin, logoutAdmin } = useTournament();
 
   const handleSelectTab = (tabId: string) => {
@@ -45,6 +53,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenAdminLogin, onOpenResetM
       ) 
     },
     { id: 'playoffs', label: 'Playoffs', icon: Trophy },
+    { id: 'rules', label: 'Rules & Conduct', icon: ScrollText },
     { id: 'statistics', label: 'Statistics', icon: BarChart2 },
   ];
 
@@ -153,18 +162,33 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenAdminLogin, onOpenResetM
             )}
           </button>
 
-          {/* Reset Tournament for Admin */}
+          {/* Admin actions when logged in */}
           {isAdmin && (
-            <button
-              onClick={() => {
-                onNavigate?.();
-                onOpenResetModal?.();
-              }}
-              className="w-full flex items-center gap-3.5 px-4 py-3 sm:py-2.5 rounded-xl font-medium text-sm transition-all group min-h-[44px] text-rose-600 hover:text-rose-700 hover:bg-rose-50/80 mt-1"
-            >
-              <RotateCcw className="w-4 h-4 text-rose-500" />
-              <span>Reset Tournament</span>
-            </button>
+            <>
+              {onOpenChangePassword && (
+                <button
+                  onClick={() => {
+                    onNavigate?.();
+                    onOpenChangePassword();
+                  }}
+                  className="w-full flex items-center gap-3.5 px-4 py-3 sm:py-2.5 rounded-xl font-medium text-sm transition-all group min-h-[44px] text-slate-700 hover:text-slate-900 hover:bg-slate-100/80 mt-1"
+                >
+                  <KeyRound className="w-4 h-4 text-amber-500" />
+                  <span>Change Password</span>
+                </button>
+              )}
+
+              <button
+                onClick={() => {
+                  onNavigate?.();
+                  onOpenResetModal?.();
+                }}
+                className="w-full flex items-center gap-3.5 px-4 py-3 sm:py-2.5 rounded-xl font-medium text-sm transition-all group min-h-[44px] text-rose-600 hover:text-rose-700 hover:bg-rose-50/80 mt-1"
+              >
+                <RotateCcw className="w-4 h-4 text-rose-500" />
+                <span>Reset Tournament</span>
+              </button>
+            </>
           )}
         </nav>
       </div>

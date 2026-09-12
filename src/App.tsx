@@ -16,12 +16,14 @@ import { PlayerDirectory } from './components/players/PlayerDirectory';
 import { TournamentWizard } from './components/admin/TournamentWizard';
 import { TournamentSummary } from './components/home/TournamentSummary';
 import { DynamicStats } from './components/home/DynamicStats';
+import { TournamentRules } from './components/rules/TournamentRules';
 
 // Modals
 import { AdminLoginModal } from './components/admin/AdminLoginModal';
 import { ScoreEntryModal } from './components/admin/ScoreEntryModal';
 import { MatchDetailsModal } from './components/fixtures/MatchDetailsModal';
 import { ResetModal } from './components/admin/ResetModal';
+import { ChangePasswordModal } from './components/admin/ChangePasswordModal';
 import { ExportImportModal } from './components/admin/ExportImportModal';
 import { QualificationModal } from './components/playoffs/QualificationModal';
 import { GoldenBootCelebrationModal } from './components/standings/GoldenBootCelebrationModal';
@@ -44,6 +46,7 @@ const MainAppContent: React.FC = () => {
 
   const [adminLoginOpen, setAdminLoginOpen] = useState(false);
   const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [exportImportOpen, setExportImportOpen] = useState(false);
   const [activeScoreMatch, setActiveScoreMatch] = useState<Match | null>(null);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -88,6 +91,7 @@ const MainAppContent: React.FC = () => {
         <Sidebar 
           onOpenAdminLogin={() => setAdminLoginOpen(true)}
           onOpenResetModal={() => setResetModalOpen(true)}
+          onOpenChangePassword={() => setChangePasswordOpen(true)}
         />
       </div>
 
@@ -109,6 +113,10 @@ const MainAppContent: React.FC = () => {
                 setMobileSidebarOpen(false);
                 setResetModalOpen(true);
               }}
+              onOpenChangePassword={() => {
+                setMobileSidebarOpen(false);
+                setChangePasswordOpen(true);
+              }}
             />
           </div>
         </div>
@@ -124,6 +132,7 @@ const MainAppContent: React.FC = () => {
         <TopHeader
           onOpenAdminLogin={() => setAdminLoginOpen(true)}
           onOpenResetModal={() => setResetModalOpen(true)}
+          onOpenChangePassword={() => setChangePasswordOpen(true)}
           onToggleMobileSidebar={() => setMobileSidebarOpen(!mobileSidebarOpen)}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
@@ -186,6 +195,10 @@ const MainAppContent: React.FC = () => {
             </div>
           )}
 
+          {activeTab === 'rules' && (
+            <TournamentRules />
+          )}
+
           {activeTab === 'players' && (
             <div className="p-4 sm:p-8 max-w-7xl mx-auto w-full animate-in fade-in duration-200">
               <PlayerDirectory onSelectPlayer={handleSelectPlayer} />
@@ -201,7 +214,10 @@ const MainAppContent: React.FC = () => {
           {activeTab === 'admin' && (
             <div className="p-4 sm:p-8 max-w-7xl mx-auto w-full animate-in fade-in duration-200">
               {isAdmin ? (
-                <TournamentWizard onOpenResetModal={() => setResetModalOpen(true)} />
+                <TournamentWizard 
+                  onOpenResetModal={() => setResetModalOpen(true)}
+                  onOpenChangePassword={() => setChangePasswordOpen(true)}
+                />
               ) : (
                 <div className="bg-slate-950/60 backdrop-blur-xl border border-white/20 rounded-3xl p-8 sm:p-12 shadow-2xl max-w-md mx-auto text-center space-y-5 text-white my-10">
                   <div className="w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-400/40 mx-auto flex items-center justify-center text-amber-400 shadow-lg">
@@ -255,6 +271,13 @@ const MainAppContent: React.FC = () => {
         <ResetModal
           isOpen={resetModalOpen}
           onClose={() => setResetModalOpen(false)}
+        />
+      )}
+
+      {isAdmin && (
+        <ChangePasswordModal
+          isOpen={changePasswordOpen}
+          onClose={() => setChangePasswordOpen(false)}
         />
       )}
 

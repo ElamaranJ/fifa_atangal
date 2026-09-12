@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Tournament tracker security rules:
+    // Anyone can read tournament data (spectators, public users, live screens)
+    match /tournaments/{tournamentId} {
+      allow read: if true;
+
+      // NOTE ON CLIENT-SIDE PIN SECURITY:
+      // Client-side PIN comparison (admin123) is a user-interface barrier, but technically
+      // anyone with the Firebase client config could call the Firestore API directly.
+      //
+      // In production, you can restrict writes to:
+      // 1. Signed-in Firebase Auth users: allow write: if request.auth != null;
+      // 2. Or require request payload to match the tournament adminPin:
+      // allow write: if request.resource.data.adminPin == resource.data.adminPin;
+      
+      // For development and initial launch:
+      allow write: if true;
+    }
+  }
+}

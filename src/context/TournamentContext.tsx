@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { 
   Tournament, 
   Player, 
@@ -6,10 +6,8 @@ import {
   PlayoffBracketData, 
   PlayerStatistics, 
   DynamicTournamentStats,
-  GroupFormat,
-  QualificationMethod
 } from '../types/tournament';
-import { StorageService } from '../services/storage';
+import { StorageService, DEFAULT_ADMIN_PIN, TournamentFirestoreDoc } from '../services/storage';
 import { recalculateTournamentState } from '../services/statsCalculator';
 import { generateFixtures } from '../services/fixtureGenerator';
 import { DEMO_TOURNAMENT, DEMO_PLAYERS, createDemoMatches, DEMO_PLAYOFFS } from '../data/demoTournament';
@@ -26,6 +24,8 @@ interface TournamentContextType {
   goldenBootLeaders: PlayerStatistics[];
   dynamicStats: DynamicTournamentStats;
   isAdmin: boolean;
+  isLoading: boolean;
+  syncStatus: 'synced' | 'syncing' | 'offline' | 'error';
   activeTab: string;
   setActiveTab: (tab: string) => void;
   // Admin actions
@@ -63,32 +63,14 @@ interface TournamentContextType {
 const TournamentContext = createContext<TournamentContextType | undefined>(undefined);
 
 export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Load state from Storage or fall back to rich Demo Tournament
-  const [tournament, setTournament] = useState<Tournament>(() => {
-    const loaded = StorageService.loadTournament();
-    if (!loaded || loaded.id === 'tour_attangal_2026') return DEMO_TOURNAMENT;
-    return loaded;
-  });
+  const [tournament, setTournament] = useState<Tournament>(DEMO_TOURNAMENT);
+  const [players, setPlayers] = useState<Player[]>(DEMO_PLAYERS);
+  const [matches, setMatches] = useState<Match[]>(createDemoMatches);
+  const [playoffs, setPlayoffs] = useState<PlayoffBracketData>(DEMO_PLAYOFFS);
+  const [adminPin, setAdminPin] = useState<string>(DEFAULT_ADMIN_PIN);
 
-  const [players, setPlayers] = useState<Player[]>(() => {
-    const tour = StorageService.loadTournament();
-    if (!tour || tour.id === 'tour_attangal_2026') return DEMO_PLAYERS;
-    const loaded = StorageService.loadPlayers();
-    return loaded.length > 0 ? loaded : DEMO_PLAYERS;
-  });
-
-  const [matches, setMatches] = useState<Match[]>(() => {
-    const tour = StorageService.loadTournament();
-    if (!tour || tour.id === 'tour_attangal_2026') return createDemoMatches();
-    const loaded = StorageService.loadMatches();
-    return loaded.length > 0 ? loaded : createDemoMatches();
-  });
-
-  const [playoffs, setPlayoffs] = useState<PlayoffBracketData>(() => {
-    const tour = StorageService.loadTournament();
-    if (!tour || tour.id === 'tour_attangal_2026') return DEMO_PLAYOFFS;
-    return StorageService.loadPlayoffs() || DEMO_PLAYOFFS;
-  });
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'offline' | 'error'>('syncing');
 
   const [isAdmin, setIsAdmin] = useState<boolean>(() => StorageService.isAdminLoggedIn());
   const [activeTab, setActiveTab] = useState<string>('home');
@@ -104,21 +86,88 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   // Top Golden boot leader reference to detect lead changes
   const [lastGoldenBootLeaderId, setLastGoldenBootLeaderId] = useState<string | null>(null);
 
-  // Sync to Storage on changes
+  // Suppress write loop when an update is incoming from remote onSnapshot
+  const isRemoteSyncing = useRef(false);
+  const hasInitialized = useRef(false);
+
+  // 1. Initial Firestore Setup & Real-time Subscription (Requirement 4 & 6)
   useEffect(() => {
-    StorageService.saveTournament(tournament);
+    let isMounted = true;
+
+    async function initFirestore() {
+      try {
+        // Attempt initial seeding if Firestore has genuinely no data yet (first-ever load)
+        await StorageService.seedInitialDataIfEmpty(
+          DEMO_TOURNAMENT,
+          DEMO_PLAYERS,
+          createDemoMatches(),
+          DEMO_PLAYOFFS
+        );
+      } catch (err) {
+        console.error('[Storage] Seeding check failed:', err);
+      }
+    }
+
+    initFirestore();
+
+    // Subscribe to real-time changes across all devices via Firestore onSnapshot
+    const unsubscribe = StorageService.subscribeTournamentData(
+      (data: TournamentFirestoreDoc | null) => {
+        if (!isMounted) return;
+
+        if (data) {
+          isRemoteSyncing.current = true;
+          if (data.tournament) setTournament(data.tournament);
+          if (Array.isArray(data.players)) setPlayers(data.players);
+          if (Array.isArray(data.matches)) setMatches(data.matches);
+          if (data.playoffs) setPlayoffs(data.playoffs);
+          if (data.adminPin) setAdminPin(data.adminPin);
+
+          setTimeout(() => {
+            isRemoteSyncing.current = false;
+            hasInitialized.current = true;
+          }, 60);
+        } else {
+          hasInitialized.current = true;
+        }
+
+        setIsLoading(false);
+        setSyncStatus('synced');
+      },
+      (error: Error) => {
+        if (!isMounted) return;
+        console.error('[Storage] Sync error:', error);
+        setIsLoading(false);
+        setSyncStatus('error');
+        hasInitialized.current = true;
+      }
+    );
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, []);
+
+  // 2. Synchronize local state mutations to Firestore (suppressed during remote onSnapshot updates)
+  useEffect(() => {
+    if (!hasInitialized.current || isRemoteSyncing.current) return;
+    StorageService.saveTournament(tournament).catch(err => console.error('[Storage] Save tournament error:', err));
   }, [tournament]);
 
   useEffect(() => {
-    StorageService.savePlayers(players);
+    if (!hasInitialized.current || isRemoteSyncing.current) return;
+    StorageService.savePlayers(players).catch(err => console.error('[Storage] Save players error:', err));
   }, [players]);
 
   useEffect(() => {
-    StorageService.saveMatches(matches);
+    if (!hasInitialized.current || isRemoteSyncing.current) return;
+    StorageService.saveMatches(matches).catch(err => console.error('[Storage] Save matches error:', err));
   }, [matches]);
 
   useEffect(() => {
-    StorageService.savePlayoffs(playoffs);
+    if (!hasInitialized.current || isRemoteSyncing.current) return;
+    StorageService.savePlayoffs(playoffs).catch(err => console.error('[Storage] Save playoffs error:', err));
   }, [playoffs]);
 
   // Recalculate all statistics centrally via pure deterministic engine
@@ -157,14 +206,13 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, []);
 
   const loginAdmin = useCallback((pin: string): boolean => {
-    const savedPin = StorageService.getAdminPin();
-    if (pin === savedPin || pin === 'admin123') {
+    if (pin === adminPin || pin === 'admin123') {
       setIsAdmin(true);
       StorageService.setAdminLoggedIn(true);
       return true;
     }
     return false;
-  }, []);
+  }, [adminPin]);
 
   const logoutAdmin = useCallback(() => {
     setIsAdmin(false);
@@ -318,57 +366,49 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         date: date !== undefined ? date : m.date,
         time: time !== undefined ? time : m.time,
         location: location !== undefined ? location : m.location,
-        status: status || m.status,
+        status: status !== undefined ? status : m.status,
       };
     }));
   }, []);
 
-  // Starting Playoffs (Top 4 bracket)
   const startPlayoffs = useCallback((): { success: boolean; error?: string } => {
     const leagueMatches = matches.filter(m => m.stage === 'LEAGUE');
-    const incomplete = leagueMatches.filter(m => m.status !== 'COMPLETED');
-    if (incomplete.length > 0) {
-      return { success: false, error: `Cannot start playoffs: ${incomplete.length} league matches are still incomplete.` };
+    const allDone = leagueMatches.length > 0 && leagueMatches.every(m => m.status === 'COMPLETED');
+    if (!allDone) {
+      return { success: false, error: 'All league matches must be completed before starting playoffs!' };
     }
 
-    let qualifiedIds: string[] = [];
-
-    if (tournament.group_format === 'SINGLE' || tournament.qualification_method === 'TWO_GROUPS_OVERALL_TOP_4') {
-      qualifiedIds = overallStats.slice(0, 4).map(s => s.player_id);
-    } else if (tournament.qualification_method === 'TWO_GROUPS_TOP_2_EACH') {
-      const topA = groupAStats.slice(0, 2).map(s => s.player_id);
-      const topB = groupBStats.slice(0, 2).map(s => s.player_id);
-      if (topA.length < 2 || topB.length < 2) {
-        return { success: false, error: 'Not enough qualified players in Group A or B.' };
-      }
-      // Semi Final 1: A1 vs B2
-      // Semi Final 2: B1 vs A2
-      qualifiedIds = [topA[0], topB[1], topB[0], topA[1]];
-    } else if (tournament.qualification_method === 'TWO_GROUPS_CUSTOM') {
-      const kA = tournament.custom_qualify_group_a ?? 2;
-      const kB = tournament.custom_qualify_group_b ?? 2;
-      const topA = groupAStats.slice(0, kA).map(s => s.player_id);
-      const topB = groupBStats.slice(0, kB).map(s => s.player_id);
-      qualifiedIds = [...topA, ...topB].slice(0, 4);
-    }
-
-    if (qualifiedIds.length < 4) {
-      return { success: false, error: 'Exactly 4 qualified players are required to start the Semi Finals.' };
-    }
-
-    let sf1P1: string, sf1P2: string, sf2P1: string, sf2P2: string;
-
-    if (tournament.qualification_method === 'TWO_GROUPS_TOP_2_EACH') {
-      sf1P1 = qualifiedIds[0]; // A1
-      sf1P2 = qualifiedIds[1]; // B2
-      sf2P1 = qualifiedIds[2]; // B1
-      sf2P2 = qualifiedIds[3]; // A2
+    let top4: PlayerStatistics[] = [];
+    if (tournament.group_format === 'SINGLE') {
+      top4 = overallStats.slice(0, 4);
     } else {
-      // 1 vs 4, 2 vs 3
-      sf1P1 = qualifiedIds[0];
-      sf1P2 = qualifiedIds[3];
-      sf2P1 = qualifiedIds[1];
-      sf2P2 = qualifiedIds[2];
+      if (tournament.qualification_method === 'TWO_GROUPS_TOP_2_EACH') {
+        const topA = groupAStats.slice(0, 2);
+        const topB = groupBStats.slice(0, 2);
+        top4 = [...topA, ...topB];
+      } else {
+        top4 = overallStats.slice(0, 4);
+      }
+    }
+
+    if (top4.length < 4) {
+      return { success: false, error: 'At least 4 contenders are required for playoffs.' };
+    }
+
+    let sf1P1 = top4[0].player_id;
+    let sf1P2 = top4[3].player_id;
+    let sf2P1 = top4[1].player_id;
+    let sf2P2 = top4[2].player_id;
+
+    if (tournament.group_format === 'TWO_GROUPS' && tournament.qualification_method === 'TWO_GROUPS_TOP_2_EACH') {
+      const topA = groupAStats.slice(0, 2);
+      const topB = groupBStats.slice(0, 2);
+      if (topA.length >= 2 && topB.length >= 2) {
+        sf1P1 = topA[0].player_id;
+        sf1P2 = topB[1].player_id;
+        sf2P1 = topB[0].player_id;
+        sf2P2 = topA[1].player_id;
+      }
     }
 
     const sf1: Match = {
@@ -403,9 +443,8 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setTournament(prev => ({ ...prev, status: 'SEMI_FINALS' }));
     setActiveTab('playoffs');
     return { success: true };
-  }, [matches, tournament, overallStats, groupAStats, groupBStats]);
+  }, [matches, tournament, overallStats, groupAStats, groupBStats, setActiveTab]);
 
-  // Submit playoff result and advance winners
   const submitPlayoffResult = useCallback((
     stage: 'SEMI_FINAL_1' | 'SEMI_FINAL_2' | 'FINAL' | 'THIRD_PLACE',
     s1: number,
@@ -475,7 +514,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         updated.third_place_player_id = winnerId;
       }
 
-      // If both semi-finals are completed, auto-generate Final and 3rd Place match!
+      // If both semi-finals are completed, auto-generate Final and 3rd Place match
       if (
         updated.semi_final_1?.status === 'COMPLETED' &&
         updated.semi_final_2?.status === 'COMPLETED' &&
@@ -521,7 +560,6 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     });
   }, [tournament.id]);
 
-  // 3-tier Reset
   const resetTournament = useCallback((mode: 'RESULTS_ONLY' | 'FIXTURES_AND_RESULTS' | 'COMPLETE') => {
     if (mode === 'RESULTS_ONLY') {
       setMatches(prev => StorageService.resetResultsOnly(prev));
@@ -552,7 +590,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setPlayoffs({});
       setActiveTab('admin');
     }
-  }, []);
+  }, [setActiveTab]);
 
   const exportTournamentData = useCallback((): string => {
     return StorageService.exportBackup(tournament, players, matches, playoffs);
@@ -570,7 +608,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setPlayoffs(b.playoffs || {});
     setActiveTab('home');
     return { success: true };
-  }, []);
+  }, [setActiveTab]);
 
   return (
     <TournamentContext.Provider
@@ -585,6 +623,8 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         goldenBootLeaders,
         dynamicStats,
         isAdmin,
+        isLoading,
+        syncStatus,
         activeTab,
         setActiveTab,
         setIsAdmin,

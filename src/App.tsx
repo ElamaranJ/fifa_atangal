@@ -35,7 +35,8 @@ const MainAppContent: React.FC = () => {
     setActiveTab, 
     setSelectedPlayerForProfile, 
     selectedMatchForDetails, 
-    setSelectedMatchForDetails 
+    setSelectedMatchForDetails,
+    isLoading,
   } = useTournament();
 
   const [adminLoginOpen, setAdminLoginOpen] = useState(false);
@@ -56,6 +57,25 @@ const MainAppContent: React.FC = () => {
   const handleSelectPlayer = (player: PlayerStatistics) => {
     setSelectedPlayerForProfile(player);
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#070b14] flex flex-col items-center justify-center text-center p-6 space-y-5 select-none">
+        <div className="relative flex items-center justify-center">
+          <div className="w-20 h-20 rounded-full border-4 border-cyan-500/20 border-t-cyan-400 animate-spin" />
+          <span className="absolute text-2xl animate-bounce">⚽</span>
+        </div>
+        <div className="space-y-1.5 max-w-sm">
+          <h2 className="text-xl font-display font-black text-white tracking-widest uppercase">
+            Connecting to Tournament Cloud
+          </h2>
+          <p className="text-xs text-cyan-400/80 font-mono">
+            Synchronizing live fixtures, standings & multi-device results...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex bg-slate-900 overflow-x-hidden font-sans">

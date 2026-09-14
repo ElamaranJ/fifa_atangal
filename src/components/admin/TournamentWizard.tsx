@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useTournament } from '../../context/TournamentContext';
-import { Tournament, Player, GroupFormat, QualificationMethod } from '../../types/tournament';
+import { Tournament, Player, GroupFormat, QualificationMethod, MasterPlayer } from '../../types/tournament';
 import { PlayerAvatar } from '../common/PlayerAvatar';
 import { compressImage } from '../../services/storage';
 import { calculateTheoreticalMatches } from '../../services/fixtureGenerator';
@@ -15,11 +15,16 @@ import {
   Plus, 
   Trash2, 
   Upload, 
-  ArrowRight,
+  ArrowRight, 
   ShieldCheck,
   RotateCcw,
   KeyRound,
   Save,
+  CheckSquare,
+  Square,
+  Search,
+  UserCheck,
+  UserPlus
 } from 'lucide-react';
 
 interface TournamentWizardProps {
@@ -39,6 +44,8 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
     startPlayoffs, 
     setActiveTab,
     isAdmin,
+    masterRoster,
+    addMasterPlayer,
   } = useTournament();
 
   const [activeStep, setActiveStep] = useState<number>(1);
@@ -55,22 +62,16 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
   const [customA, setCustomA] = useState<number>(tournament.custom_qualify_group_a ?? 2);
   const [customB, setCustomB] = useState<number>(tournament.custom_qualify_group_b ?? 2);
 
+  // New player inline creation states
+  const [newPlayerNameInput, setNewPlayerNameInput] = useState('');
+  const [newPlayerPhotoPreview, setNewPlayerPhotoPreview] = useState<string | undefined>();
+  const [rosterSearchQuery, setRosterSearchQuery] = useState('');
+  const newPlayerFileInputRef = useRef<HTMLInputElement>(null);
+
   const [wizardPlayers, setWizardPlayers] = useState<Player[]>(() => {
     if (players.length > 0) return [...players];
-    const initial: Player[] = [];
-    for (let i = 0; i < 8; i++) {
-      const p: Player = {
-        id: `p_${Date.now()}_${i + 1}`,
-        tournament_id: tournament.id,
-        player_name: `Player ${String.fromCharCode(65 + i)}`,
-        created_at: new Date().toISOString(),
-      };
-      if (tournament.group_format === 'TWO_GROUPS') {
-        p.group_name = i % 2 === 0 ? 'Group A' : 'Group B';
-      }
-      initial.push(p);
-    }
-    return initial;
+    // If master roster exists, don't create dummy players
+    return [];
   });
 
   // Helper to build a clean Player object without undefined properties (which crash Firestore)
@@ -240,6 +241,108 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
     setStatusAlert({
       type: 'success',
       text: `✅ Tournament setup & roster saved (${finalPlayers.length} players)! You can generate fixtures now or anytime later.`
+    });
+  };
+
+  // Toggle selection of a Master Player into wizardPlayers
+  const handleToggleMasterPlayer = (mp: MasterPlayer) => {
+    isUserDirty.current = true;
+    setWizardPlayers(prev => {
+      const exists = prev.some(p => p.id === mp.id);
+      if (exists) {
+        const next = prev.filter(p => p.id !== mp.id);
+        setNumPlayersInput(next.length);
+        return next;
+      } else {
+        const newP: Player = {
+          id: mp.id,
+          tournament_id: tournament.id,
+          player_name: mp.player_name,
+          player_photo: mp.player_photo,
+          created_at: new Date().toISOString(),
+        };
+        if (groupFormat === 'TWO_GROUPS') {
+          newP.group_name = prev.length % 2 === 0 ? 'Group A' : 'Group B';
+        }
+        const next = [...prev, newP];
+        setNumPlayersInput(next.length);
+        return next;
+      }
+    });
+  };
+
+  const handleSelectAllMasterPlayers = () => {
+    isUserDirty.current = true;
+    const activeMaster = masterRoster.filter(p => !p.is_archived);
+    const existingIds = new Set(wizardPlayers.map(p => p.id));
+    const toAdd = activeMaster.filter(p => !existingIds.has(p.id));
+
+    setWizardPlayers(prev => {
+      const next = [
+        ...prev,
+        ...toAdd.map((mp, idx) => {
+          const p: Player = {
+            id: mp.id,
+            tournament_id: tournament.id,
+            player_name: mp.player_name,
+            player_photo: mp.player_photo,
+            created_at: new Date().toISOString(),
+          };
+          if (groupFormat === 'TWO_GROUPS') {
+            p.group_name = (prev.length + idx) % 2 === 0 ? 'Group A' : 'Group B';
+          }
+          return p;
+        }),
+      ];
+      setNumPlayersInput(next.length);
+      return next;
+    });
+  };
+
+  const handleDeselectAll = () => {
+    isUserDirty.current = true;
+    setWizardPlayers([]);
+    setNumPlayersInput(0);
+  };
+
+  const handleAddNewPlayerToRoster = async () => {
+    const trimmed = newPlayerNameInput.trim();
+    if (!trimmed) return;
+    isUserDirty.current = true;
+
+    // 1. Add to Master Roster
+    const createdMaster = await addMasterPlayer(trimmed, newPlayerPhotoPreview);
+
+    // 2. Automatically select for this tournament with same ID & photo
+    const newP: Player = {
+      id: createdMaster.id,
+      tournament_id: tournament.id,
+      player_name: createdMaster.player_name,
+      player_photo: createdMaster.player_photo,
+      created_at: createdMaster.created_at,
+    };
+    if (groupFormat === 'TWO_GROUPS') {
+      newP.group_name = wizardPlayers.length % 2 === 0 ? 'Group A' : 'Group B';
+    }
+
+    setWizardPlayers(prev => {
+      const next = [...prev, newP];
+      setNumPlayersInput(next.length);
+      return next;
+    });
+
+    setNewPlayerNameInput('');
+    setNewPlayerPhotoPreview(undefined);
+    setStatusAlert({ type: 'success', text: `Added ${trimmed} to Master Roster and current tournament!` });
+    setTimeout(() => setStatusAlert(null), 2500);
+  };
+
+  const handleRemoveTournamentPlayer = (id: string) => {
+    isUserDirty.current = true;
+    setWizardPlayers(prev => {
+      const next = prev.filter(p => p.id !== id);
+      setNumPlayersInput(next.length);
+      return next;
     });
   };
 
@@ -547,37 +650,26 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
         </div>
       )}
 
-      {/* Step 2: Dynamic Player Registration & Photo Upload */}
+      {/* Step 2: Master Roster Selection & Player Registration */}
       {activeStep === 2 && (
-        <div className="bg-white/95 backdrop-blur-md border border-white/80 rounded-3xl p-6 sm:p-8 shadow-md space-y-6 animate-in fade-in">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="bg-white/95 backdrop-blur-md border border-white/80 rounded-3xl p-6 sm:p-8 shadow-md space-y-7 animate-in fade-in">
+          
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
             <div>
-              <h3 className="font-display text-xl font-black text-slate-900">Step 2: Player Registration</h3>
-              <p className="text-xs text-slate-500 font-medium">
-                Enter number of competitors and customize names and optional profile pictures
+              <div className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-[#1d6bf3]" />
+                <h3 className="font-display text-xl font-black text-slate-900">Step 2: Competitor Selection & Registration</h3>
+              </div>
+              <p className="text-xs text-slate-500 font-medium mt-1">
+                Select competitors from your persistent Global Roster or add new ones. Selected players carry their names and profile photos across seasons.
               </p>
             </div>
 
-            {/* Dynamic Player Count Selector & Save Roster */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center gap-2 bg-slate-100 p-2 rounded-2xl border border-slate-200">
-                <span className="text-xs font-bold text-slate-700">Total Players:</span>
-                <input
-                  type="number"
-                  min="2"
-                  max="64"
-                  value={numPlayersInput}
-                  onChange={(e) => handleGeneratePlayerInputs(parseInt(e.target.value) || 2)}
-                  className="w-16 px-2 py-1 text-center font-display font-bold text-sm bg-white border border-slate-300 rounded-lg text-[#1d6bf3] focus:outline-none focus:ring-2 focus:ring-[#1d6bf3]/30"
-                />
-                <button
-                  onClick={() => handleGeneratePlayerInputs(numPlayersInput)}
-                  className="px-3 py-1 bg-[#1d6bf3] text-white text-xs font-bold rounded-lg hover:bg-[#1557c0] transition-colors"
-                >
-                  Apply
-                </button>
-              </div>
-
+            <div className="flex items-center gap-3">
+              <span className="px-3 py-1.5 rounded-xl bg-blue-50 text-[#1d6bf3] font-bold text-xs border border-blue-200">
+                {wizardPlayers.length} Competitors Selected
+              </span>
               <button
                 type="button"
                 onClick={handleSaveRoster}
@@ -589,59 +681,245 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
             </div>
           </div>
 
-          {/* Dynamic Input Rows */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[460px] overflow-y-auto pr-1">
-            {wizardPlayers.map((player, idx) => (
-              <div
-                key={player.id}
-                className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-2xl shadow-xs"
-              >
-                <span className="w-6 text-center font-mono text-xs font-bold text-slate-400">
-                  #{idx + 1}
+          {/* Section A: Global Player Roster Selection */}
+          <div className="space-y-3 bg-slate-50/80 p-5 rounded-2xl border border-slate-200">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <h4 className="font-display font-bold text-sm text-slate-800">
+                  Global Player Roster
+                </h4>
+                <span className="text-[11px] font-semibold text-slate-400">
+                  ({masterRoster.filter(p => !p.is_archived).length} total players)
                 </span>
+              </div>
 
-                <div className="relative group shrink-0">
-                  <PlayerAvatar
-                    name={player.player_name}
-                    photo={player.player_photo}
-                    size="md"
-                    glow={!!player.player_photo}
+              {/* Search and Quick Select */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search roster..."
+                    value={rosterSearchQuery}
+                    onChange={(e) => setRosterSearchQuery(e.target.value)}
+                    className="w-36 sm:w-44 pl-7 pr-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1d6bf3]/30"
                   />
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2 top-2" />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSelectAllMasterPlayers}
+                  className="px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 transition-colors flex items-center gap-1"
+                >
+                  <CheckSquare className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Select All</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeselectAll}
+                  className="px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 transition-colors flex items-center gap-1"
+                >
+                  <Square className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Clear</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Add New Player input bar */}
+            <div className="flex items-center gap-2 pt-1">
+              <div className="relative shrink-0">
+                <PlayerAvatar
+                  name={newPlayerNameInput || 'New'}
+                  photo={newPlayerPhotoPreview}
+                  size="sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => newPlayerFileInputRef.current?.click()}
+                  title="Upload photo"
+                  className="absolute inset-0 rounded-full bg-black/50 opacity-0 hover:opacity-100 flex items-center justify-center transition-opacity"
+                >
+                  <Upload className="w-3 h-3 text-white" />
+                </button>
+                <input
+                  type="file"
+                  ref={newPlayerFileInputRef}
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    try {
+                      const base64 = await compressImage(file);
+                      setNewPlayerPhotoPreview(base64);
+                    } catch {
+                      // ignore
+                    }
+                  }}
+                  className="hidden"
+                />
+              </div>
+
+              <input
+                type="text"
+                placeholder="+ Register new competitor (e.g. John Doe)..."
+                value={newPlayerNameInput}
+                onChange={(e) => setNewPlayerNameInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddNewPlayerToRoster();
+                  }
+                }}
+                className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1d6bf3]/30"
+              />
+
+              <button
+                type="button"
+                onClick={handleAddNewPlayerToRoster}
+                disabled={!newPlayerNameInput.trim()}
+                className="px-3.5 py-2 bg-[#1d6bf3] hover:bg-[#1557c0] disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add & Select</span>
+              </button>
+            </div>
+
+            {/* Master Roster Checklist Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 max-h-48 overflow-y-auto pr-1 pt-2">
+              {masterRoster
+                .filter(p => !p.is_archived && (!rosterSearchQuery.trim() || p.player_name.toLowerCase().includes(rosterSearchQuery.toLowerCase())))
+                .map((mp) => {
+                  const isSelected = wizardPlayers.some(p => p.id === mp.id);
+                  return (
+                    <div
+                      key={mp.id}
+                      onClick={() => handleToggleMasterPlayer(mp)}
+                      className={`flex items-center gap-2.5 p-2 rounded-xl border cursor-pointer select-none transition-all ${
+                        isSelected
+                          ? 'bg-blue-50/80 border-[#1d6bf3] shadow-xs'
+                          : 'bg-white border-slate-200 hover:border-slate-300 opacity-75 hover:opacity-100'
+                      }`}
+                    >
+                      <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 text-white transition-colors ${
+                        isSelected ? 'bg-[#1d6bf3]' : 'border border-slate-300 bg-white'
+                      }`}>
+                        {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                      </div>
+                      <PlayerAvatar
+                        name={mp.player_name}
+                        photo={mp.player_photo}
+                        size="xs"
+                      />
+                      <span className={`text-xs font-bold truncate flex-1 ${isSelected ? 'text-blue-950' : 'text-slate-700'}`}>
+                        {mp.player_name}
+                      </span>
+                    </div>
+                  );
+                })}
+              {masterRoster.filter(p => !p.is_archived).length === 0 && (
+                <div className="col-span-full py-4 text-center text-xs text-slate-400">
+                  No players in global roster yet. Type a name above to register your first competitor!
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Section B: Active Selected Tournament Competitors */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-display font-bold text-base text-slate-900">
+                  Active Competitors for this Tournament ({wizardPlayers.length})
+                </h4>
+                <p className="text-xs text-slate-500">
+                  {groupFormat === 'TWO_GROUPS' ? 'Assign Group A/B and customize player details' : 'Review competitor names and photos'}
+                </p>
+              </div>
+
+              {groupFormat === 'TWO_GROUPS' && wizardPlayers.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleAutoDivideGroups}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 transition-colors flex items-center gap-1"
+                >
+                  <span>Auto-Divide (A / B)</span>
+                </button>
+              )}
+            </div>
+
+            {/* Dynamic Input Rows */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[420px] overflow-y-auto pr-1">
+              {wizardPlayers.map((player, idx) => (
+                <div
+                  key={player.id}
+                  className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-2xl shadow-xs"
+                >
+                  <span className="w-6 text-center font-mono text-xs font-bold text-slate-400">
+                    #{idx + 1}
+                  </span>
+
+                  <div className="relative group shrink-0">
+                    <PlayerAvatar
+                      name={player.player_name}
+                      photo={player.player_photo}
+                      size="md"
+                      glow={!!player.player_photo}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUploadingPlayerId(player.id);
+                        fileInputRef.current?.click();
+                      }}
+                      title="Upload / Change Photo"
+                      className="absolute inset-0 rounded-full bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer"
+                    >
+                      <Upload className="w-3.5 h-3.5 text-white" />
+                    </button>
+                  </div>
+
+                  <input
+                    type="text"
+                    value={player.player_name}
+                    onChange={(e) => handleUpdatePlayerName(player.id, e.target.value)}
+                    placeholder={`Player ${idx + 1} name...`}
+                    className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1d6bf3]/30 focus:border-[#1d6bf3]"
+                  />
+
+                  {groupFormat === 'TWO_GROUPS' && (
+                    <button
+                      type="button"
+                      onClick={() => handleToggleGroup(player.id)}
+                      className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold transition-colors ${
+                        player.group_name === 'Group B'
+                          ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                          : 'bg-cyan-100 text-cyan-800 border border-cyan-200'
+                      }`}
+                    >
+                      {player.group_name || 'Group A'}
+                    </button>
+                  )}
+
                   <button
                     type="button"
-                    onClick={() => {
-                      setUploadingPlayerId(player.id);
-                      fileInputRef.current?.click();
-                    }}
-                    title="Upload / Change Photo"
-                    className="absolute inset-0 rounded-full bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer"
-                  >
-                    <Upload className="w-3.5 h-3.5 text-white" />
-                  </button>
-                </div>
-
-                <input
-                  type="text"
-                  value={player.player_name}
-                  onChange={(e) => handleUpdatePlayerName(player.id, e.target.value)}
-                  placeholder={`Player ${idx + 1} name...`}
-                  className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1d6bf3]/30 focus:border-[#1d6bf3]"
-                />
-
-                {player.player_photo && (
-                  <button
-                    onClick={() => {
-                      isUserDirty.current = true;
-                      setWizardPlayers(prev => prev.map(p => p.id === player.id ? { ...p, player_photo: undefined } : p));
-                    }}
-                    title="Remove Photo"
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 text-xs"
+                    onClick={() => handleRemoveTournamentPlayer(player.id)}
+                    title="Remove from this tournament"
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 text-xs transition-colors"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
-                )}
-              </div>
-            ))}
+                </div>
+              ))}
+
+              {wizardPlayers.length === 0 && (
+                <div className="col-span-full py-8 text-center bg-slate-50/50 border-2 border-dashed border-slate-200 rounded-2xl">
+                  <Users className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                  <p className="text-xs font-bold text-slate-600">No Competitors Selected</p>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Select players from the Global Roster above or add new players.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
 
           <input
@@ -670,8 +948,10 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
               </button>
               <button
                 onClick={() => {
-                  handleSaveRoster();
-                  setActiveStep(3);
+                  const valid = handleSaveRoster();
+                  if (valid) {
+                    setActiveStep(3);
+                  }
                 }}
                 className="px-6 py-2.5 rounded-xl bg-[#1d6bf3] hover:bg-[#1557c0] text-white font-bold text-sm flex items-center gap-2 shadow-md transition-all hover:scale-105 active:scale-95"
               >

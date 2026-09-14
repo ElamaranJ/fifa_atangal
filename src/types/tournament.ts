@@ -42,6 +42,35 @@ export interface Tournament {
   logo_url?: string;
 }
 
+export interface TournamentIndexEntry {
+  id: string;
+  tournament_name: string;
+  status: TournamentStatus;
+  created_at: string;
+  logo_url?: string;
+}
+
+export interface MasterPlayer {
+  id: string;
+  player_name: string;
+  player_photo?: string;
+  created_at: string;
+  is_archived?: boolean; // soft-delete, never hard-delete so history stays intact
+}
+
+export interface SeasonRecord {
+  id: string;
+  season_label: string;          // e.g. "Season 5", "Champions League"
+  champion_name: string;
+  champion_player_id?: string;   // optional link to masterRoster.id if known
+  golden_boot_name?: string;
+  golden_boot_goals?: number;
+  golden_boot_player_id?: string;
+  tournament_id?: string;        // link back to the completed tournament, if auto-generated
+  order?: number;                // for custom chronological sorting
+  created_at: string;
+}
+
 export interface Player {
   id: string;
   tournament_id: string;

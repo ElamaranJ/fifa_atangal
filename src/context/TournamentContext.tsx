@@ -7,8 +7,11 @@ import {
   PlayerStatistics, 
   DynamicTournamentStats,
   TournamentRulesData,
+  MasterPlayer,
+  SeasonRecord,
+  TournamentIndexEntry,
 } from '../types/tournament';
-import { StorageService, DEFAULT_ADMIN_PIN, TournamentFirestoreDoc } from '../services/storage';
+import { StorageService, DEFAULT_ADMIN_PIN, TournamentFirestoreDoc, SEED_HALL_OF_FAME } from '../services/storage';
 import { recalculateTournamentState } from '../services/statsCalculator';
 import { generateFixtures } from '../services/fixtureGenerator';
 import { INITIAL_EMPTY_TOURNAMENT, DEMO_TOURNAMENT_ID } from '../data/demoTournament';
@@ -33,6 +36,27 @@ interface TournamentContextType {
   syncStatus: 'synced' | 'syncing' | 'offline' | 'error';
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  // Multi-Tournament
+  tournamentIndex: TournamentIndexEntry[];
+  activeTournamentId: string;
+  switchTournament: (id: string) => void;
+  createNewTournament: (name: string) => Promise<string>;
+  deleteTournament: (id: string) => Promise<void>;
+  // Master Roster
+  masterRoster: MasterPlayer[];
+  addMasterPlayer: (name: string, photo?: string) => Promise<MasterPlayer>;
+  updateMasterPlayer: (id: string, updates: Partial<MasterPlayer>) => Promise<void>;
+  archiveMasterPlayer: (id: string) => Promise<void>;
+  // Hall of Fame
+  hallOfFame: SeasonRecord[];
+  addSeasonRecord: (record: Omit<SeasonRecord, 'id' | 'created_at'>) => Promise<void>;
+  updateSeasonRecord: (id: string, updates: Partial<SeasonRecord>) => Promise<void>;
+  deleteSeasonRecord: (id: string) => Promise<void>;
+  // Hall of Fame capture queue (prevents race conditions with concurrent tournaments)
+  pendingHallOfFameCaptures: Array<{ defaultData: Partial<SeasonRecord> }>;
+  popPendingHallOfFameCapture: () => void;
+  pendingHallOfFameCapture: { isOpen: boolean; defaultData: Partial<SeasonRecord> } | null;
+  setPendingHallOfFameCapture: (capture: { isOpen: boolean; defaultData: Partial<SeasonRecord> } | null) => void;
   // Admin actions
   setIsAdmin: (status: boolean) => void;
   loginAdmin: (pin: string) => boolean;
@@ -76,32 +100,54 @@ interface TournamentContextType {
 const TournamentContext = createContext<TournamentContextType | undefined>(undefined);
 
 export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [activeTournamentId, setActiveTournamentId] = useState<string>(() => {
+    return StorageService.getActiveTournamentIdLocal() || INITIAL_EMPTY_TOURNAMENT.id;
+  });
+  const [tournamentIndex, setTournamentIndex] = useState<TournamentIndexEntry[]>(() => {
+    return StorageService.loadTournamentIndexLocal();
+  });
   const [tournament, setTournament] = useState<Tournament>(() => {
-    const local = StorageService.loadTournamentLocal();
+    const activeId = StorageService.getActiveTournamentIdLocal() || INITIAL_EMPTY_TOURNAMENT.id;
+    const local = StorageService.loadTournamentLocal(activeId);
     return local || INITIAL_EMPTY_TOURNAMENT;
   });
   const [players, setPlayers] = useState<Player[]>(() => {
-    const local = StorageService.loadPlayersLocal();
-    return local || [];
+    const activeId = StorageService.getActiveTournamentIdLocal() || INITIAL_EMPTY_TOURNAMENT.id;
+    return StorageService.loadPlayersLocal(activeId);
   });
   const [matches, setMatches] = useState<Match[]>(() => {
-    const local = StorageService.loadMatchesLocal();
-    return local || [];
+    const activeId = StorageService.getActiveTournamentIdLocal() || INITIAL_EMPTY_TOURNAMENT.id;
+    return StorageService.loadMatchesLocal(activeId);
   });
   const [playoffs, setPlayoffs] = useState<PlayoffBracketData>(() => {
-    const local = StorageService.loadPlayoffsLocal();
-    return local || {};
+    const activeId = StorageService.getActiveTournamentIdLocal() || INITIAL_EMPTY_TOURNAMENT.id;
+    return StorageService.loadPlayoffsLocal(activeId);
   });
   const [rules, setRules] = useState<TournamentRulesData>(() => {
-    try {
-      const saved = localStorage.getItem('efootball_rules_data');
-      if (saved) return JSON.parse(saved);
-    } catch {
-      // fallback
-    }
-    return DEFAULT_TOURNAMENT_RULES;
+    const activeId = StorageService.getActiveTournamentIdLocal() || INITIAL_EMPTY_TOURNAMENT.id;
+    return StorageService.loadRulesLocal(activeId);
   });
   const [adminPin, setAdminPin] = useState<string>(() => localStorage.getItem('efootball_admin_pin') || DEFAULT_ADMIN_PIN);
+
+  // Master Roster & Hall of Fame states (Persistent across tournaments & seasons)
+  const [masterRoster, setMasterRoster] = useState<MasterPlayer[]>(() => StorageService.loadMasterRosterLocal());
+  const [hallOfFame, setHallOfFame] = useState<SeasonRecord[]>(() => StorageService.loadHallOfFameLocal());
+
+  // Capture queue for Hall of Fame prompts (supports concurrent tournament completions)
+  const [pendingHallOfFameCaptures, setPendingHallOfFameCaptures] = useState<Array<{ defaultData: Partial<SeasonRecord> }>>([]);
+  const popPendingHallOfFameCapture = useCallback(() => {
+    setPendingHallOfFameCaptures(prev => prev.slice(1));
+  }, []);
+  const pendingHallOfFameCapture = useMemo(() => {
+    return pendingHallOfFameCaptures.length > 0 ? { isOpen: true, defaultData: pendingHallOfFameCaptures[0].defaultData } : null;
+  }, [pendingHallOfFameCaptures]);
+  const setPendingHallOfFameCapture = useCallback((capture: { isOpen: boolean; defaultData: Partial<SeasonRecord> } | null) => {
+    if (!capture || !capture.isOpen) {
+      popPendingHallOfFameCapture();
+    } else {
+      setPendingHallOfFameCaptures(prev => [...prev, { defaultData: capture.defaultData }]);
+    }
+  }, [popPendingHallOfFameCapture]);
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'offline' | 'error'>('syncing');
@@ -126,28 +172,52 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   // Track in-flight admin password updates to prevent premature onSnapshot overwrite
   const pendingPasswordRef = useRef<string | null>(null);
 
-  // 1. Initial Firestore Setup & Real-time Subscription
+  // 1. Initial Multi-Tournament Migration & Setup
   useEffect(() => {
     let isMounted = true;
 
     async function initFirestore() {
       try {
-        // Purge any legacy localStorage mock data
-        const localT = localStorage.getItem('fifa_tournament');
-        if (localT && localT.includes(DEMO_TOURNAMENT_ID)) {
-          localStorage.removeItem('fifa_tournament');
-          localStorage.removeItem('fifa_players');
-          localStorage.removeItem('fifa_matches');
-          localStorage.removeItem('fifa_playoffs');
+        // First-run migration for multi-tournament
+        const migrationResult = await StorageService.migrateLegacySingletonIfPresent(INITIAL_EMPTY_TOURNAMENT);
+        if (isMounted) {
+          setTournamentIndex(migrationResult.entries);
+          if (migrationResult.activeId && migrationResult.activeId !== activeTournamentId) {
+            setActiveTournamentId(migrationResult.activeId);
+            const localT = StorageService.loadTournamentLocal(migrationResult.activeId);
+            if (localT) setTournament(localT);
+            setPlayers(StorageService.loadPlayersLocal(migrationResult.activeId));
+            setMatches(StorageService.loadMatchesLocal(migrationResult.activeId));
+            setPlayoffs(StorageService.loadPlayoffsLocal(migrationResult.activeId));
+            setRules(StorageService.loadRulesLocal(migrationResult.activeId));
+          }
         }
 
-        // Initialize empty tournament if document is empty
-        await StorageService.seedInitialDataIfEmpty(
-          INITIAL_EMPTY_TOURNAMENT,
-          [],
-          [],
-          {}
-        );
+        // Global admin PIN
+        const pin = await StorageService.getAdminPin();
+        if (isMounted) setAdminPin(pin);
+
+        // Seed Hall of Fame if empty (Season 1-5 + Champions League)
+        const seededHof = await StorageService.seedHallOfFameIfEmpty();
+        if (isMounted && seededHof.length > 0) {
+          setHallOfFame(seededHof);
+        }
+
+        // First-run migration for Master Roster:
+        const existingMaster = await StorageService.loadMasterRoster();
+        if (existingMaster.length === 0) {
+          const currentPlayers = StorageService.loadPlayersLocal(migrationResult.activeId || activeTournamentId);
+          if (currentPlayers.length > 0) {
+            const initialRoster: MasterPlayer[] = currentPlayers.map(p => ({
+              id: p.id,
+              player_name: p.player_name,
+              player_photo: p.player_photo,
+              created_at: p.created_at || new Date().toISOString(),
+            }));
+            await StorageService.saveMasterRoster(initialRoster);
+            if (isMounted) setMasterRoster(initialRoster);
+          }
+        }
       } catch (err) {
         console.error('[Storage] Init check failed:', err);
       }
@@ -155,45 +225,49 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     initFirestore();
 
-    // Subscribe to real-time changes across all devices via Firestore onSnapshot
+    // Subscribe to Tournament Index
+    const unsubIndex = StorageService.subscribeTournamentIndex((entries) => {
+      if (!isMounted) return;
+      setTournamentIndex(entries);
+    });
+
+    // Subscribe to Master Roster changes
+    const unsubRoster = StorageService.subscribeMasterRoster((roster) => {
+      if (!isMounted) return;
+      setMasterRoster(roster);
+    });
+
+    // Subscribe to Hall of Fame changes
+    const unsubHof = StorageService.subscribeHallOfFame((records) => {
+      if (!isMounted) return;
+      setHallOfFame(records);
+    });
+
+    return () => {
+      isMounted = false;
+      unsubIndex();
+      unsubRoster();
+      unsubHof();
+    };
+  }, []);
+
+  // 2. Dynamic Real-time Tournament Subscription (Re-subscribes whenever activeTournamentId changes)
+  useEffect(() => {
+    let isSubscribed = true;
+    if (!activeTournamentId) return;
+
     const unsubscribe = StorageService.subscribeTournamentData(
+      activeTournamentId,
       (data: TournamentFirestoreDoc | null) => {
-        if (!isMounted) return;
+        if (!isSubscribed) return;
 
         if (data) {
-          // Detect if remote Firestore contains legacy mock data; if so, wipe it
-          const isLegacyMock = data.tournament?.id === DEMO_TOURNAMENT_ID && data.tournament?.tournament_name === 'eFOOTBALL CHAMPIONSHIP 2026';
-          if (isLegacyMock) {
-            console.log('[Storage] Found legacy mock data in Firestore. Auto-clearing to clean tournament...');
-            StorageService.clearAllData();
-            StorageService.saveTournament(INITIAL_EMPTY_TOURNAMENT);
-            StorageService.savePlayers([]);
-            StorageService.saveMatches([]);
-            StorageService.savePlayoffs({});
-            setTournament(INITIAL_EMPTY_TOURNAMENT);
-            setPlayers([]);
-            setMatches([]);
-            setPlayoffs({});
-            setIsLoading(false);
-            setSyncStatus('synced');
-            return;
-          }
-
           isRemoteSyncing.current = true;
           if (data.tournament) setTournament(data.tournament);
           if (Array.isArray(data.players)) setPlayers(data.players);
           if (Array.isArray(data.matches)) setMatches(data.matches);
           if (data.playoffs) setPlayoffs(data.playoffs);
           if (data.rules) setRules(data.rules);
-          if (data.adminPin) {
-            // Guard: Don't overwrite local adminPin state if a password change was just made locally and hasn't been confirmed yet
-            if (!pendingPasswordRef.current || data.adminPin === pendingPasswordRef.current) {
-              setAdminPin(data.adminPin);
-              if (data.adminPin === pendingPasswordRef.current) {
-                pendingPasswordRef.current = null;
-              }
-            }
-          }
 
           setTimeout(() => {
             isRemoteSyncing.current = false;
@@ -207,8 +281,8 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setSyncStatus('synced');
       },
       (error: Error) => {
-        if (!isMounted) return;
-        console.error('[Storage] Sync error:', error);
+        if (!isSubscribed) return;
+        console.error(`[Storage] Sync error for tournament ${activeTournamentId}:`, error);
         setIsLoading(false);
         setSyncStatus('error');
         hasInitialized.current = true;
@@ -216,10 +290,10 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     );
 
     return () => {
-      isMounted = false;
+      isSubscribed = false;
       unsubscribe();
     };
-  }, []);
+  }, [activeTournamentId]);
 
   // Recalculate all statistics centrally via pure deterministic engine
   const { overallStats, groupAStats, groupBStats, goldenBootLeaders, dynamicStats } = useMemo(() => {
@@ -286,8 +360,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       await StorageService.setAdminPin(cleanPin);
 
       // Confirm the adminPin field actually equals the new value before confirming success
-      const docData = await StorageService.loadTournamentDoc();
-      const verifiedPin = docData?.adminPin ?? (await StorageService.getAdminPin());
+      const verifiedPin = await StorageService.getAdminPin();
       if (verifiedPin !== cleanPin) {
         pendingPasswordRef.current = null;
         return { success: false, error: 'Password update could not be verified in database.' };
@@ -309,6 +382,71 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setActiveTab(prev => (prev === 'admin' ? 'home' : prev));
   }, []);
 
+  // ==========================================
+  // Multi-Tournament Management
+  // ==========================================
+  const switchTournament = useCallback((targetId: string) => {
+    if (!targetId || targetId === activeTournamentId) return;
+    StorageService.setActiveTournamentIdLocal(targetId);
+    setActiveTournamentId(targetId);
+
+    // Instant local load to avoid UI flash
+    const localTour = StorageService.loadTournamentLocal(targetId);
+    if (localTour) setTournament(localTour);
+    setPlayers(StorageService.loadPlayersLocal(targetId));
+    setMatches(StorageService.loadMatchesLocal(targetId));
+    setPlayoffs(StorageService.loadPlayoffsLocal(targetId));
+    setRules(StorageService.loadRulesLocal(targetId));
+  }, [activeTournamentId]);
+
+  const createNewTournament = useCallback(async (name: string): Promise<string> => {
+    if (!isAdmin) {
+      throw new Error('Admin privileges required to create a tournament.');
+    }
+    const newId = `tour_${Date.now()}`;
+    const newTour: Tournament = {
+      ...INITIAL_EMPTY_TOURNAMENT,
+      id: newId,
+      tournament_name: name.trim() || 'eFootball Championship',
+      created_at: new Date().toISOString(),
+      status: 'SETUP',
+    };
+    await StorageService.createTournament(newTour, []);
+    StorageService.setActiveTournamentIdLocal(newId);
+    setActiveTournamentId(newId);
+    setTournament(newTour);
+    setPlayers([]);
+    setMatches([]);
+    setPlayoffs({});
+    setRules(DEFAULT_TOURNAMENT_RULES);
+    setActiveTab('admin');
+    return newId;
+  }, [isAdmin, setActiveTab]);
+
+  const deleteTournament = useCallback(async (idToDelete: string): Promise<void> => {
+    if (!isAdmin) {
+      throw new Error('Admin privileges required to delete a tournament.');
+    }
+    await StorageService.deleteTournament(idToDelete);
+    if (activeTournamentId === idToDelete) {
+      const remaining = tournamentIndex.filter(e => e.id !== idToDelete);
+      if (remaining.length > 0) {
+        switchTournament(remaining[0].id);
+      } else {
+        const fallbackId = `tour_${Date.now()}`;
+        const fallbackTour: Tournament = {
+          ...INITIAL_EMPTY_TOURNAMENT,
+          id: fallbackId,
+          tournament_name: 'eFootball Championship',
+          created_at: new Date().toISOString(),
+          status: 'SETUP',
+        };
+        await StorageService.createTournament(fallbackTour, []);
+        switchTournament(fallbackId);
+      }
+    }
+  }, [isAdmin, activeTournamentId, tournamentIndex, switchTournament]);
+
   const updateTournament = useCallback((updates: Partial<Tournament>) => {
     if (!isAdmin) {
       console.warn('[Security] Unauthorized updateTournament attempt blocked');
@@ -323,21 +461,154 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     });
   }, [isAdmin]);
 
+  // ==========================================
+  // Master Roster Actions (Global / Persistent)
+  // ==========================================
+  const addMasterPlayer = useCallback(async (name: string, photo?: string): Promise<MasterPlayer> => {
+    const trimmed = name.trim();
+    const newMaster: MasterPlayer = {
+      id: `mp_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      player_name: trimmed,
+      created_at: new Date().toISOString(),
+    };
+    if (photo) newMaster.player_photo = photo;
+
+    setMasterRoster(prev => {
+      const updated = [...prev, newMaster];
+      StorageService.saveMasterRoster(updated).catch(err =>
+        console.error('[Storage] Save master roster error:', err)
+      );
+      return updated;
+    });
+    return newMaster;
+  }, []);
+
+  const updateMasterPlayer = useCallback(async (id: string, updates: Partial<MasterPlayer>): Promise<void> => {
+    if (!isAdmin) {
+      console.warn('[Security] Unauthorized updateMasterPlayer attempt blocked');
+      return;
+    }
+    setMasterRoster(prev => {
+      const updated = prev.map(p => (p.id === id ? { ...p, ...updates } : p));
+      StorageService.saveMasterRoster(updated).catch(err =>
+        console.error('[Storage] Update master player error:', err)
+      );
+      return updated;
+    });
+
+    // Also sync to active tournament player if they are currently competing
+    setPlayers(prev => {
+      const exists = prev.some(p => p.id === id);
+      if (!exists) return prev;
+      const tourUpdates: Partial<Player> = {};
+      if (updates.player_name) tourUpdates.player_name = updates.player_name;
+      if (updates.player_photo !== undefined) tourUpdates.player_photo = updates.player_photo;
+      const updated = prev.map(p => (p.id === id ? { ...p, ...tourUpdates } : p));
+      StorageService.savePlayers(updated).catch(err =>
+        console.error('[Storage] Sync master player to active tournament error:', err)
+      );
+      return updated;
+    });
+  }, [isAdmin]);
+
+  const archiveMasterPlayer = useCallback(async (id: string): Promise<void> => {
+    if (!isAdmin) {
+      console.warn('[Security] Unauthorized archiveMasterPlayer attempt blocked');
+      return;
+    }
+    setMasterRoster(prev => {
+      const updated = prev.map(p => (p.id === id ? { ...p, is_archived: true } : p));
+      StorageService.saveMasterRoster(updated).catch(err =>
+        console.error('[Storage] Archive master player error:', err)
+      );
+      return updated;
+    });
+  }, [isAdmin]);
+
+  // ==========================================
+  // Hall of Fame Actions (Global / Persistent)
+  // ==========================================
+  const addSeasonRecord = useCallback(async (record: Omit<SeasonRecord, 'id' | 'created_at'>): Promise<void> => {
+    if (!isAdmin) {
+      console.warn('[Security] Unauthorized addSeasonRecord attempt blocked');
+      return;
+    }
+
+    // Duplicate champion protection: if tied to a tournament_id that is already recorded, block duplicate
+    if (record.tournament_id && hallOfFame.some(r => r.tournament_id === record.tournament_id)) {
+      console.warn('[HallOfFame] Tournament already recorded in Hall of Fame:', record.tournament_id);
+      return;
+    }
+
+    const nextOrder = record.order ?? (hallOfFame.length > 0 ? Math.max(...hallOfFame.map(r => r.order || 0)) + 1 : 1);
+    const newRecord: SeasonRecord = {
+      ...record,
+      id: `hof_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      created_at: new Date().toISOString(),
+      order: nextOrder,
+    };
+
+    setHallOfFame(prev => {
+      const updated = [...prev, newRecord].sort((a, b) => (a.order || 0) - (b.order || 0));
+      StorageService.saveHallOfFame(updated).catch(err =>
+        console.error('[Storage] Add season record error:', err)
+      );
+      return updated;
+    });
+  }, [isAdmin, hallOfFame]);
+
+  const updateSeasonRecord = useCallback(async (id: string, updates: Partial<SeasonRecord>): Promise<void> => {
+    if (!isAdmin) {
+      console.warn('[Security] Unauthorized updateSeasonRecord attempt blocked');
+      return;
+    }
+    setHallOfFame(prev => {
+      const updated = prev.map(r => (r.id === id ? { ...r, ...updates } : r)).sort((a, b) => (a.order || 0) - (b.order || 0));
+      StorageService.saveHallOfFame(updated).catch(err =>
+        console.error('[Storage] Update season record error:', err)
+      );
+      return updated;
+    });
+  }, [isAdmin]);
+
+  const deleteSeasonRecord = useCallback(async (id: string): Promise<void> => {
+    if (!isAdmin) {
+      console.warn('[Security] Unauthorized deleteSeasonRecord attempt blocked');
+      return;
+    }
+    setHallOfFame(prev => {
+      const updated = prev.filter(r => r.id !== id);
+      StorageService.saveHallOfFame(updated).catch(err =>
+        console.error('[Storage] Delete season record error:', err)
+      );
+      return updated;
+    });
+  }, [isAdmin]);
+
   const addPlayer = useCallback((name: string, photo?: string, group?: string) => {
     if (!isAdmin) {
       console.warn('[Security] Unauthorized addPlayer attempt blocked');
       return;
     }
+    const trimmed = name.trim();
+    // Check if player already exists in master roster
+    const existingMaster = masterRoster.find(
+      p => p.player_name.toLowerCase() === trimmed.toLowerCase() && !p.is_archived
+    );
+    const playerId = existingMaster ? existingMaster.id : `p_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    const playerPhoto = photo || existingMaster?.player_photo;
+
     const newPlayer: Player = {
-      id: `p_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      id: playerId,
       tournament_id: tournament.id,
-      player_name: name.trim(),
+      player_name: trimmed,
       created_at: new Date().toISOString(),
     };
-    if (photo) newPlayer.player_photo = photo;
+    if (playerPhoto) newPlayer.player_photo = playerPhoto;
     if (group || tournament.group_format === 'TWO_GROUPS') {
       newPlayer.group_name = group || 'Group A';
     }
+
     setPlayers(prev => {
       const updated = [...prev, newPlayer];
       StorageService.savePlayers(updated).catch(err =>
@@ -345,7 +616,24 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       );
       return updated;
     });
-  }, [isAdmin, tournament.id, tournament.group_format]);
+
+    // Write through to masterRoster if player wasn't in master roster
+    if (!existingMaster) {
+      const newMaster: MasterPlayer = {
+        id: playerId,
+        player_name: trimmed,
+        created_at: new Date().toISOString(),
+      };
+      if (playerPhoto) newMaster.player_photo = playerPhoto;
+      setMasterRoster(prev => {
+        const updated = [...prev, newMaster];
+        StorageService.saveMasterRoster(updated).catch(err =>
+          console.error('[Storage] Save master roster write-through error:', err)
+        );
+        return updated;
+      });
+    }
+  }, [isAdmin, tournament.id, tournament.group_format, masterRoster]);
 
   const updatePlayer = useCallback((id: string, updates: Partial<Player>) => {
     if (!isAdmin) {
@@ -356,6 +644,20 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const updated = prev.map(p => (p.id === id ? { ...p, ...updates } : p));
       StorageService.savePlayers(updated).catch(err =>
         console.error('[Storage] Update player error:', err)
+      );
+      return updated;
+    });
+
+    // Write through to masterRoster so names and photos persist for future tournaments
+    setMasterRoster(prev => {
+      const exists = prev.some(p => p.id === id);
+      if (!exists) return prev;
+      const masterUpdates: Partial<MasterPlayer> = {};
+      if (updates.player_name) masterUpdates.player_name = updates.player_name;
+      if (updates.player_photo !== undefined) masterUpdates.player_photo = updates.player_photo;
+      const updated = prev.map(p => (p.id === id ? { ...p, ...masterUpdates } : p));
+      StorageService.saveMasterRoster(updated).catch(err =>
+        console.error('[Storage] Master roster update write-through error:', err)
       );
       return updated;
     });
@@ -860,6 +1162,41 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         tourStatusUpdate = 'COMPLETED';
         setTournament(t => ({ ...t, status: 'COMPLETED' }));
         sounds.playFanfare();
+
+        // One-time admin prompt to save season to Hall of Fame
+        if (isAdmin) {
+          const alreadyRecorded = hallOfFame.some(r => r.tournament_id === tournament.id);
+          if (!alreadyRecorded) {
+            const champPlayer = players.find(p => p.id === winnerId) || masterRoster.find(p => p.id === winnerId);
+            const champName = champPlayer?.player_name || 'Champion';
+
+            const topScorer = goldenBootLeaders[0];
+            const goldenBootName = topScorer ? topScorer.player_name : champName;
+            const goldenBootGoals = topScorer ? topScorer.total_goals : 0;
+            const goldenBootId = topScorer ? topScorer.player_id : winnerId;
+
+            const nextOrder = hallOfFame.length > 0 ? Math.max(...hallOfFame.map(r => r.order || 0)) + 1 : 1;
+            const defaultLabel = tournament.tournament_name && !tournament.tournament_name.includes('Championship')
+              ? tournament.tournament_name
+              : `Season ${nextOrder}`;
+
+            setPendingHallOfFameCaptures(prev => [
+              ...prev,
+              {
+                defaultData: {
+                  season_label: defaultLabel,
+                  champion_name: champName,
+                  champion_player_id: winnerId,
+                  golden_boot_name: goldenBootName,
+                  golden_boot_goals: goldenBootGoals,
+                  golden_boot_player_id: goldenBootId,
+                  tournament_id: tournament.id,
+                  order: nextOrder,
+                },
+              },
+            ]);
+          }
+        }
       }
 
       // Legacy fallback: if old tournament had semi_final_1 and semi_final_2
@@ -918,7 +1255,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
       return updated;
     });
-  }, [isAdmin, tournament]);
+  }, [isAdmin, tournament, hallOfFame, players, masterRoster, goldenBootLeaders]);
 
   const resetTournament = useCallback((mode: 'RESULTS_ONLY' | 'FIXTURES_AND_RESULTS' | 'COMPLETE') => {
     if (!isAdmin) {
@@ -947,17 +1284,18 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         tournament: updatedTour,
       }).catch(err => console.error('[Storage] Reset tournament fixtures error:', err));
     } else if (mode === 'COMPLETE') {
-      StorageService.clearAllData();
       const freshTournament: Tournament = {
         ...INITIAL_EMPTY_TOURNAMENT,
-        id: `tour_${Date.now()}`,
+        id: tournament.id || activeTournamentId,
+        tournament_name: tournament.tournament_name || 'eFootball Championship',
         created_at: new Date().toISOString(),
+        status: 'SETUP',
       };
       setTournament(freshTournament);
       setPlayers([]);
       setMatches([]);
       setPlayoffs({});
-      StorageService.saveTournamentState({
+      StorageService.saveTournamentState(freshTournament.id, {
         tournament: freshTournament,
         players: [],
         matches: [],
@@ -965,7 +1303,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }).catch(err => console.error('[Storage] Reset tournament complete error:', err));
       setActiveTab('admin');
     }
-  }, [isAdmin, matches, tournament, setActiveTab]);
+  }, [isAdmin, matches, tournament, activeTournamentId, setActiveTab]);
 
   const exportTournamentData = useCallback((): string => {
     return StorageService.exportBackup(tournament, players, matches, playoffs);
@@ -1024,6 +1362,27 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         syncStatus,
         activeTab,
         setActiveTab,
+        // Multi-Tournament
+        tournamentIndex,
+        activeTournamentId,
+        switchTournament,
+        createNewTournament,
+        deleteTournament,
+        // Master Roster
+        masterRoster,
+        addMasterPlayer,
+        updateMasterPlayer,
+        archiveMasterPlayer,
+        // Hall of Fame
+        hallOfFame,
+        addSeasonRecord,
+        updateSeasonRecord,
+        deleteSeasonRecord,
+        pendingHallOfFameCaptures,
+        popPendingHallOfFameCapture,
+        pendingHallOfFameCapture,
+        setPendingHallOfFameCapture,
+        // Admin actions
         setIsAdmin,
         loginAdmin,
         logoutAdmin,

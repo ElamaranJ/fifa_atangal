@@ -2,7 +2,8 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // Tournament tracker security rules:
-    // Anyone can read tournament data (spectators, public users, live screens)
+    // Anyone can read tournament data, persistent master roster, and hall of fame (spectators, public users, live screens)
+    // Covers /tournaments/active, /tournaments/roster, and /tournaments/hallOfFame
     match /tournaments/{tournamentId} {
       allow read: if true;
 

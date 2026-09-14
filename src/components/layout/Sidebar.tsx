@@ -14,13 +14,16 @@ import {
   X,
   RotateCcw,
   KeyRound,
-  ScrollText
+  ScrollText,
+  Award,
+  PlusCircle
 } from 'lucide-react';
 
 interface SidebarProps {
   onOpenAdminLogin: () => void;
   onOpenResetModal?: () => void;
   onOpenChangePassword?: () => void;
+  onOpenCreateTournament?: () => void;
   onNavigate?: () => void;
 }
 
@@ -28,6 +31,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenAdminLogin, 
   onOpenResetModal, 
   onOpenChangePassword,
+  onOpenCreateTournament,
   onNavigate 
 }) => {
   const { activeTab, setActiveTab, isAdmin, logoutAdmin, tournament } = useTournament();
@@ -53,6 +57,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ) 
     },
     { id: 'playoffs', label: 'Playoffs', icon: Trophy },
+    { id: 'hallOfFame', label: 'Hall of Fame', icon: Award },
     { id: 'rules', label: 'Rules & Conduct', icon: ScrollText },
     { id: 'statistics', label: 'Statistics', icon: BarChart2 },
   ];
@@ -165,6 +170,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {/* Admin actions when logged in */}
           {isAdmin && (
             <>
+              {onOpenCreateTournament && (
+                <button
+                  onClick={() => {
+                    onNavigate?.();
+                    onOpenCreateTournament();
+                  }}
+                  className="w-full flex items-center gap-3.5 px-4 py-3 sm:py-2.5 rounded-xl font-medium text-sm transition-all group min-h-[44px] text-[#1d6bf3] hover:text-blue-700 hover:bg-blue-50/80 mt-1"
+                >
+                  <PlusCircle className="w-4 h-4 text-[#1d6bf3]" />
+                  <span>+ New Tournament</span>
+                </button>
+              )}
+
               {onOpenChangePassword && (
                 <button
                   onClick={() => {

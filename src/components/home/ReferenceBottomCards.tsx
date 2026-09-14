@@ -209,7 +209,7 @@ export const ReferenceBottomCards: React.FC<ReferenceBottomCardsProps> = ({
             </button>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-[420px] overflow-y-auto pr-0.5">
             {overallStats.length === 0 ? (
               <div className="py-8 text-center space-y-2">
                 <BarChart2 className="w-8 h-8 text-slate-300 mx-auto" />
@@ -220,7 +220,7 @@ export const ReferenceBottomCards: React.FC<ReferenceBottomCardsProps> = ({
               </div>
             ) : (
               <table className="w-full text-left text-xs border-collapse">
-              <thead>
+              <thead className="sticky top-0 bg-white z-10 shadow-xs">
                 <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
                   <th className="py-2 px-1 text-center w-6">#</th>
                   <th className="py-2 px-1">Player</th>
@@ -235,7 +235,7 @@ export const ReferenceBottomCards: React.FC<ReferenceBottomCardsProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-[11px]">
-                {overallStats.slice(0, 8).map((player, idx) => {
+                {overallStats.map((player, idx) => {
                   const isLeader = player.rank === 1;
                   const isTop4 = player.rank <= 4;
 

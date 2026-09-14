@@ -17,6 +17,7 @@ import { TournamentWizard } from './components/admin/TournamentWizard';
 import { TournamentSummary } from './components/home/TournamentSummary';
 import { DynamicStats } from './components/home/DynamicStats';
 import { TournamentRules } from './components/rules/TournamentRules';
+import { HallOfFame } from './components/hallOfFame/HallOfFame';
 
 // Modals
 import { AdminLoginModal } from './components/admin/AdminLoginModal';
@@ -28,6 +29,8 @@ import { ExportImportModal } from './components/admin/ExportImportModal';
 import { QualificationModal } from './components/playoffs/QualificationModal';
 import { GoldenBootCelebrationModal } from './components/standings/GoldenBootCelebrationModal';
 import { PlayerProfileModal } from './components/players/PlayerProfileModal';
+import { SaveToHallOfFameModal } from './components/hallOfFame/SaveToHallOfFameModal';
+import { CreateTournamentModal } from './components/admin/CreateTournamentModal';
 
 import { SuperstarsBackdrop } from './components/layout/SuperstarsBackdrop';
 import { Match, PlayerStatistics } from './types/tournament';
@@ -48,6 +51,7 @@ const MainAppContent: React.FC = () => {
   const [resetModalOpen, setResetModalOpen] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [exportImportOpen, setExportImportOpen] = useState(false);
+  const [createTournamentOpen, setCreateTournamentOpen] = useState(false);
   const [activeScoreMatch, setActiveScoreMatch] = useState<Match | null>(null);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -92,6 +96,7 @@ const MainAppContent: React.FC = () => {
           onOpenAdminLogin={() => setAdminLoginOpen(true)}
           onOpenResetModal={() => setResetModalOpen(true)}
           onOpenChangePassword={() => setChangePasswordOpen(true)}
+          onOpenCreateTournament={() => setCreateTournamentOpen(true)}
         />
       </div>
 
@@ -117,6 +122,10 @@ const MainAppContent: React.FC = () => {
                 setMobileSidebarOpen(false);
                 setChangePasswordOpen(true);
               }}
+              onOpenCreateTournament={() => {
+                setMobileSidebarOpen(false);
+                setCreateTournamentOpen(true);
+              }}
             />
           </div>
         </div>
@@ -133,6 +142,7 @@ const MainAppContent: React.FC = () => {
           onOpenAdminLogin={() => setAdminLoginOpen(true)}
           onOpenResetModal={() => setResetModalOpen(true)}
           onOpenChangePassword={() => setChangePasswordOpen(true)}
+          onOpenCreateTournament={() => setCreateTournamentOpen(true)}
           onToggleMobileSidebar={() => setMobileSidebarOpen(!mobileSidebarOpen)}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
@@ -197,6 +207,12 @@ const MainAppContent: React.FC = () => {
 
           {activeTab === 'rules' && (
             <TournamentRules />
+          )}
+
+          {activeTab === 'hallOfFame' && (
+            <div className="p-4 sm:p-8 max-w-7xl mx-auto w-full animate-in fade-in duration-200">
+              <HallOfFame />
+            </div>
           )}
 
           {activeTab === 'players' && (
@@ -289,6 +305,11 @@ const MainAppContent: React.FC = () => {
       <QualificationModal />
       <GoldenBootCelebrationModal />
       <PlayerProfileModal />
+      <SaveToHallOfFameModal />
+      <CreateTournamentModal
+        isOpen={createTournamentOpen}
+        onClose={() => setCreateTournamentOpen(false)}
+      />
 
     </div>
   );

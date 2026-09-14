@@ -110,9 +110,9 @@ export const ResetModal: React.FC<ResetModalProps> = ({ isOpen, onClose }) => {
                   className="mt-1 accent-rose-500"
                 />
                 <div>
-                  <h4 className="text-sm font-bold text-rose-300">Complete Reset (Factory Reset)</h4>
+                  <h4 className="text-sm font-bold text-rose-300">Complete Reset (Active Tournament)</h4>
                   <p className="text-xs text-slate-300 mt-0.5">
-                    Wipes everything completely. Starts a fresh empty tournament ready for initial configuration.
+                    Resets this active tournament to a clean empty state. Does not affect other concurrent tournaments, Master Roster, or Hall of Fame archive.
                   </p>
                 </div>
               </label>

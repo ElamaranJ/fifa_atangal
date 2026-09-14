@@ -1,11 +1,13 @@
 import React from 'react';
 import { useTournament } from '../../context/TournamentContext';
 import { Search, Sun, VolumeX, Lock, Unlock, User, Menu, RotateCcw, KeyRound } from 'lucide-react';
+import { TournamentSwitcher } from './TournamentSwitcher';
 
 interface TopHeaderProps {
   onOpenAdminLogin: () => void;
   onOpenResetModal?: () => void;
   onOpenChangePassword?: () => void;
+  onOpenCreateTournament?: () => void;
   onToggleMobileSidebar: () => void;
   searchQuery: string;
   onSearchChange: (q: string) => void;
@@ -15,6 +17,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   onOpenAdminLogin,
   onOpenResetModal,
   onOpenChangePassword,
+  onOpenCreateTournament,
   onToggleMobileSidebar,
   searchQuery,
   onSearchChange,
@@ -26,15 +29,23 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   return (
     <header className="w-full flex items-center justify-between gap-1.5 sm:gap-4 px-2.5 sm:px-8 py-2.5 sm:py-3.5 select-none relative z-20">
       
-      {/* Mobile Sidebar Hamburger Button (Min 44px touch target) */}
-      <div className="flex items-center md:hidden shrink-0">
-        <button
-          onClick={onToggleMobileSidebar}
-          aria-label="Open navigation menu"
-          className="min-w-[44px] min-h-[44px] p-2.5 rounded-xl shadow-sm flex items-center justify-center transition-colors bg-white/95 border border-slate-200 text-slate-700 hover:bg-slate-50"
-        >
-          <Menu className="w-5 h-5" />
-        </button>
+      {/* Mobile Sidebar Hamburger Button & Tournament Switcher */}
+      <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center md:hidden">
+          <button
+            onClick={onToggleMobileSidebar}
+            aria-label="Open navigation menu"
+            className="min-w-[44px] min-h-[44px] p-2.5 rounded-xl shadow-sm flex items-center justify-center transition-colors bg-white/95 border border-slate-200 text-slate-700 hover:bg-slate-50"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Tournament Switcher */}
+        <TournamentSwitcher
+          onOpenCreateModal={onOpenCreateTournament || (() => {})}
+          onOpenAdminLogin={onOpenAdminLogin}
+        />
       </div>
 
       {/* Center Floating Search Input */}

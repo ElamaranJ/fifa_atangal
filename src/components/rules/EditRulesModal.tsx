@@ -14,7 +14,7 @@ import {
   Scale
 } from 'lucide-react';
 import { useTournament } from '../../context/TournamentContext';
-import { TournamentRulesData, TournamentRuleItem, RuleSeverity, FixtureMode } from '../../types/tournament';
+import { TournamentRulesData, TournamentRuleItem, RuleCategory, RuleSeverity, FixtureMode } from '../../types/tournament';
 import { DEFAULT_TOURNAMENT_RULES } from '../../data/defaultRules';
 
 interface EditRulesModalProps {
@@ -75,12 +75,13 @@ export const EditRulesModal: React.FC<EditRulesModalProps> = ({ isOpen, onClose 
   };
 
   const handleAddRule = () => {
+    const category: RuleCategory = activeCategory === 'college' ? 'college' : 'home';
     const newRule: TournamentRuleItem = {
-      id: `${activeCategory}-${Date.now()}`,
-      category: activeCategory === 'general' ? 'home' : activeCategory,
+      id: `${category}-${Date.now()}`,
+      category,
       title: 'New Tournament Rule',
       description: 'Enter rule description and dispute criteria here...',
-      badge: activeCategory === 'home' ? '🏠 Home Protocol' : '🏫 Campus Protocol',
+      badge: category === 'home' ? '🏠 Home Protocol' : '🏫 Campus Protocol',
       severity: 'info',
       isHighlighted: false,
     };

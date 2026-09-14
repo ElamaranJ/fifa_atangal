@@ -25,6 +25,8 @@ export type MatchStage =
   | 'ELIMINATOR' 
   | 'QUALIFIER_2';
 
+export type FixtureMode = 'FREQUENCY' | 'MATCH_COUNT';
+
 export interface Tournament {
   id: string;
   tournament_name: string;
@@ -32,6 +34,8 @@ export interface Tournament {
   group_format: GroupFormat;
   same_group_match_frequency: number;
   other_group_match_frequency: number;
+  fixture_mode?: FixtureMode;
+  matches_per_player?: number;
   qualification_method: QualificationMethod;
   custom_qualify_group_a?: number;
   custom_qualify_group_b?: number;

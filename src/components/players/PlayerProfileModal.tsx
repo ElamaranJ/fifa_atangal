@@ -191,7 +191,7 @@ export const PlayerProfileModal: React.FC = () => {
         </div>
 
         {/* Golden Boot standing row */}
-        <div className="flex items-center justify-between p-3.5 bg-gradient-to-r from-amber-500/10 to-transparent border border-amber-500/20 rounded-xl mb-6">
+        <div className="flex items-center justify-between p-3.5 bg-gradient-to-r from-amber-500/10 to-transparent border border-amber-500/20 rounded-xl mb-3">
           <div className="flex items-center gap-2.5">
             <Flame className="w-5 h-5 text-amber-400" />
             <div>
@@ -201,10 +201,33 @@ export const PlayerProfileModal: React.FC = () => {
               </span>
             </div>
           </div>
-          <div className="text-right">
-            <span className="text-base font-display font-black text-amber-400">{player.total_goals} Goals</span>
-          </div>
+          <span className="font-display text-lg font-black text-amber-300">
+            {player.total_goals} Goals
+          </span>
         </div>
+
+        {/* Home / Away Balance Allocation */}
+        {(() => {
+          const homeCount = matches.filter(m => m.stage === 'LEAGUE' && m.player_1 === player.player_id).length;
+          const awayCount = matches.filter(m => m.stage === 'LEAGUE' && m.player_2 === player.player_id).length;
+          if (homeCount === 0 && awayCount === 0) return null;
+          return (
+            <div className="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-xl mb-6 text-xs">
+              <span className="text-slate-400 font-mono text-[11px] font-semibold">Scheduled League Balance</span>
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-mono font-bold text-[11px]">
+                  {homeCount} Home
+                </span>
+                <span className="px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/40 font-mono font-bold text-[11px]">
+                  {awayCount} Away
+                </span>
+                <span className="text-slate-400 font-mono text-[11px]">
+                  ({homeCount + awayCount} Total)
+                </span>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Match History list */}
         <div>

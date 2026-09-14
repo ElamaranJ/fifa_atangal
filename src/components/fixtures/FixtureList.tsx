@@ -174,8 +174,41 @@ export const FixtureList: React.FC<FixtureListProps> = ({
               ))}
             </select>
           </div>
-
         </div>
+
+        {/* Home / Away Balance Quick Check Bar */}
+        {players.length > 0 && (
+          <div className="pt-3 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2 text-slate-300">
+              <span className="text-[11px] font-mono uppercase font-bold text-cyan-400">⚖️ Home/Away Parity:</span>
+              <span className="text-[11px] text-slate-400">
+                {matches.filter(m => m.stage === 'LEAGUE').length} matches ({matches.filter(m => m.stage === 'LEAGUE').length} Home slots, {matches.filter(m => m.stage === 'LEAGUE').length} Away slots)
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {players.slice(0, 6).map(p => {
+                const h = matches.filter(m => m.stage === 'LEAGUE' && m.player_1 === p.id).length;
+                const a = matches.filter(m => m.stage === 'LEAGUE' && m.player_2 === p.id).length;
+                return (
+                  <span
+                    key={p.id}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 text-[10px] font-mono text-slate-300"
+                    title={`${p.player_name}: ${h} Home, ${a} Away`}
+                  >
+                    <span className="font-bold text-white max-w-[60px] truncate">{p.player_name.split(' ')[0]}</span>
+                    <span className="text-cyan-300">{h}H</span>
+                    <span className="text-slate-500">/</span>
+                    <span className="text-purple-300">{a}A</span>
+                  </span>
+                );
+              })}
+              {players.length > 6 && (
+                <span className="text-[10px] text-slate-400 font-mono">+{players.length - 6} more</span>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Fixture Grid */}

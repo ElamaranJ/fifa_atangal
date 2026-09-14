@@ -9,10 +9,12 @@ import {
   Home, 
   GraduationCap,
   Sparkles,
-  ShieldAlert
+  ShieldAlert,
+  Sliders,
+  Scale
 } from 'lucide-react';
 import { useTournament } from '../../context/TournamentContext';
-import { TournamentRulesData, TournamentRuleItem, RuleSeverity } from '../../types/tournament';
+import { TournamentRulesData, TournamentRuleItem, RuleSeverity, FixtureMode } from '../../types/tournament';
 import { DEFAULT_TOURNAMENT_RULES } from '../../data/defaultRules';
 
 interface EditRulesModalProps {
@@ -21,10 +23,13 @@ interface EditRulesModalProps {
 }
 
 export const EditRulesModal: React.FC<EditRulesModalProps> = ({ isOpen, onClose }) => {
-  const { rules, updateRules, resetRulesToDefault } = useTournament();
+  const { rules, updateRules, resetRulesToDefault, tournament, updateTournament, players } = useTournament();
 
-  const [activeCategory, setActiveCategory] = useState<'home' | 'college' | 'general'>('home');
+  const [activeCategory, setActiveCategory] = useState<'home' | 'college' | 'general' | 'matchQuota'>('home');
   const [formData, setFormData] = useState<TournamentRulesData>(() => JSON.parse(JSON.stringify(rules)));
+  const [fixtureMode, setFixtureMode] = useState<FixtureMode>(tournament.fixture_mode || 'FREQUENCY');
+  const [matchesPerPlayer, setMatchesPerPlayer] = useState<number>(tournament.matches_per_player || 8);
+  const [sameGroupFreq, setSameGroupFreq] = useState<number>(tournament.same_group_match_frequency || 1);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
   const [resetConfirm, setResetConfirm] = useState<boolean>(false);
@@ -33,10 +38,13 @@ export const EditRulesModal: React.FC<EditRulesModalProps> = ({ isOpen, onClose 
   React.useEffect(() => {
     if (isOpen) {
       setFormData(JSON.parse(JSON.stringify(rules)));
+      setFixtureMode(tournament.fixture_mode || 'FREQUENCY');
+      setMatchesPerPlayer(tournament.matches_per_player || 8);
+      setSameGroupFreq(tournament.same_group_match_frequency || 1);
       setSaveSuccess(false);
       setResetConfirm(false);
     }
-  }, [isOpen, rules]);
+  }, [isOpen, rules, tournament]);
 
   if (!isOpen) return null;
 
@@ -108,6 +116,11 @@ export const EditRulesModal: React.FC<EditRulesModalProps> = ({ isOpen, onClose 
         lastUpdated: new Date().toISOString(),
       };
       await updateRules(updatedPayload);
+      await updateTournament({
+        fixture_mode: fixtureMode,
+        matches_per_player: matchesPerPlayer,
+        same_group_match_frequency: sameGroupFreq,
+      });
       setSaveSuccess(true);
       setTimeout(() => {
         setSaveSuccess(false);
@@ -213,9 +226,21 @@ export const EditRulesModal: React.FC<EditRulesModalProps> = ({ isOpen, onClose 
               <Sparkles className="w-3.5 h-3.5" />
               <span>General Notice</span>
             </button>
+
+            <button
+              onClick={() => setActiveCategory('matchQuota')}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                activeCategory === 'matchQuota'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Sliders className="w-3.5 h-3.5" />
+              <span>Match Quota (N Matches)</span>
+            </button>
           </div>
 
-          {activeCategory !== 'general' && (
+          {activeCategory !== 'general' && activeCategory !== 'matchQuota' && (
             <button
               onClick={handleAddRule}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg shadow-sm transition-colors"
@@ -235,7 +260,158 @@ export const EditRulesModal: React.FC<EditRulesModalProps> = ({ isOpen, onClose 
             </div>
           )}
 
-          {activeCategory === 'general' ? (
+          {activeCategory === 'matchQuota' ? (
+            <div className="space-y-6 bg-slate-950/60 p-5 rounded-2xl border border-slate-800">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div>
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <Scale className="w-4 h-4 text-cyan-400" />
+                    Tournament League Match Quota
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Configure matches per player with automated Home/Away balance.
+                  </p>
+                </div>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-bold">
+                  {tournament.group_format === 'SINGLE' ? 'Single League Format' : 'Two Groups Format'}
+                </span>
+              </div>
+
+              {tournament.group_format === 'SINGLE' ? (
+                <div className="space-y-5">
+                  {/* Mode selector: Frequency Cycles vs Matches Per Player */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                      Fixture Generation Mode
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div
+                        onClick={() => setFixtureMode('FREQUENCY')}
+                        className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+                          fixtureMode === 'FREQUENCY'
+                            ? 'bg-blue-600/20 border-blue-500 text-white'
+                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-xs">Standard Frequency Cycles</span>
+                          <input
+                            type="radio"
+                            name="fixture_mode_rules"
+                            checked={fixtureMode === 'FREQUENCY'}
+                            onChange={() => setFixtureMode('FREQUENCY')}
+                            className="text-blue-600"
+                          />
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-1">
+                          Full round-robin multiplier (e.g. 1x, 2x, 3x against every opponent).
+                        </p>
+                      </div>
+
+                      <div
+                        onClick={() => setFixtureMode('MATCH_COUNT')}
+                        className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+                          fixtureMode === 'MATCH_COUNT'
+                            ? 'bg-blue-600/20 border-blue-500 text-white'
+                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-xs">Fixed Matches per Player (N)</span>
+                          <input
+                            type="radio"
+                            name="fixture_mode_rules"
+                            checked={fixtureMode === 'MATCH_COUNT'}
+                            onChange={() => setFixtureMode('MATCH_COUNT')}
+                            className="text-blue-600"
+                          />
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-1">
+                          Each player gets exactly N matches with balanced Home and Away.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {fixtureMode === 'MATCH_COUNT' ? (
+                    <div className="p-4 bg-slate-900 rounded-xl border border-slate-800 space-y-4">
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label htmlFor="matches-per-player-input" className="text-xs font-bold text-slate-200">
+                            Each player plays N matches (Home/Away auto-balanced)
+                          </label>
+                          <span className="text-xs font-mono font-bold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/30">
+                            → {Math.ceil(matchesPerPlayer / 2)} Home, {Math.floor(matchesPerPlayer / 2)} Away per player
+                          </span>
+                        </div>
+                        <input
+                          id="matches-per-player-input"
+                          type="number"
+                          min={1}
+                          max={50}
+                          value={matchesPerPlayer}
+                          onChange={(e) => setMatchesPerPlayer(Math.max(1, parseInt(e.target.value) || 1))}
+                          className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm text-white font-mono font-bold focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-center text-xs">
+                        <div className="p-2.5 bg-slate-950 rounded-lg border border-slate-800">
+                          <span className="text-[10px] text-slate-400 block font-mono">Home Target</span>
+                          <span className="font-display font-bold text-cyan-400 text-sm">
+                            {Math.ceil(matchesPerPlayer / 2)} Home
+                          </span>
+                        </div>
+                        <div className="p-2.5 bg-slate-950 rounded-lg border border-slate-800">
+                          <span className="text-[10px] text-slate-400 block font-mono">Away Target</span>
+                          <span className="font-display font-bold text-purple-400 text-sm">
+                            {Math.floor(matchesPerPlayer / 2)} Away
+                          </span>
+                        </div>
+                        <div className="p-2.5 bg-slate-950 rounded-lg border border-slate-800">
+                          <span className="text-[10px] text-slate-400 block font-mono">Total Fixtures</span>
+                          <span className="font-display font-bold text-amber-400 text-sm">
+                            {Math.floor((players.length * matchesPerPlayer) / 2)} Matches
+                          </span>
+                        </div>
+                      </div>
+
+                      {players.length > 0 && (players.length * matchesPerPlayer) % 2 !== 0 && (
+                        <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-lg text-xs">
+                          ⚠️ For an odd number of players ({players.length}), total match slots ({players.length * matchesPerPlayer}) is odd. Please select an even number of matches so every match has two competitors.
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-slate-900 rounded-xl border border-slate-800 space-y-3">
+                      <label className="text-xs font-bold text-slate-200 block">
+                        Round Robin Multiplier (Same Group Frequency)
+                      </label>
+                      <select
+                        value={sameGroupFreq}
+                        onChange={(e) => setSameGroupFreq(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                      >
+                        <option value={1}>1 Match against each player (Single Round Robin)</option>
+                        <option value={2}>2 Matches against each player (Double Round Robin - Home & Away)</option>
+                        <option value={3}>3 Matches against each player (Triple Round Robin)</option>
+                        <option value={4}>4 Matches against each player (Quadruple)</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-4 bg-slate-900 rounded-xl border border-slate-800 text-xs text-slate-400 space-y-2">
+                  <p>
+                    Fixed "Matches Per Player (N)" is available when the tournament format is set to <strong className="text-white">Single League</strong>.
+                  </p>
+                  <p>
+                    Current tournament format is <strong className="text-cyan-400">Two Groups (A & B)</strong>, where matches are determined by intra-group and cross-group frequency settings.
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : activeCategory === 'general' ? (
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">

@@ -13,7 +13,7 @@ import {
 } from '../types/tournament';
 import { StorageService, DEFAULT_ADMIN_PIN, TournamentFirestoreDoc, SEED_HALL_OF_FAME } from '../services/storage';
 import { recalculateTournamentState } from '../services/statsCalculator';
-import { generateFixtures } from '../services/fixtureGenerator';
+import { generateFixtures, generateFixturesByMatchCount } from '../services/fixtureGenerator';
 import { INITIAL_EMPTY_TOURNAMENT, DEMO_TOURNAMENT_ID } from '../data/demoTournament';
 import { DEFAULT_TOURNAMENT_RULES } from '../data/defaultRules';
 import { sounds } from '../services/soundEffects';
@@ -763,13 +763,30 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
     }
 
-    const generated = generateFixtures(
-      activeTournament.id,
-      activePlayers,
-      activeTournament.group_format,
-      activeTournament.same_group_match_frequency,
-      activeTournament.other_group_match_frequency
-    );
+    let generated: Match[];
+    if (
+      activeTournament.group_format === 'SINGLE' &&
+      activeTournament.fixture_mode === 'MATCH_COUNT' &&
+      activeTournament.matches_per_player
+    ) {
+      try {
+        generated = generateFixturesByMatchCount(
+          activeTournament.id,
+          activePlayers,
+          activeTournament.matches_per_player
+        );
+      } catch (err: any) {
+        return { success: false, error: err?.message || 'Failed to generate match count fixtures.' };
+      }
+    } else {
+      generated = generateFixtures(
+        activeTournament.id,
+        activePlayers,
+        activeTournament.group_format,
+        activeTournament.same_group_match_frequency,
+        activeTournament.other_group_match_frequency
+      );
+    }
 
     const updatedTour: Tournament = {
       ...tournament,

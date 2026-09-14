@@ -69,7 +69,7 @@ export const MatchCard: React.FC<MatchCardProps> = ({ match, onSelect, onEnterSc
       >
         {/* Mobile View (< sm): 2-row sports fixture layout */}
         <div className="sm:hidden space-y-2.5 py-1">
-          {/* Row 1: Player 1 */}
+          {/* Row 1: Player 1 (Home) */}
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5 min-w-0 flex-1">
               <PlayerAvatar
@@ -79,9 +79,14 @@ export const MatchCard: React.FC<MatchCardProps> = ({ match, onSelect, onEnterSc
                 glow={match.winner_id === match.player_1}
               />
               <div className="min-w-0 flex-1">
-                <h4 className={`text-sm font-bold truncate ${match.winner_id === match.player_1 ? 'text-cyan-300 font-black' : 'text-white'}`}>
-                  {p1Name}
-                </h4>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <h4 className={`text-sm font-bold truncate ${match.winner_id === match.player_1 ? 'text-cyan-300 font-black' : 'text-white'}`}>
+                    {p1Name}
+                  </h4>
+                  <span className="text-[8px] font-mono font-black uppercase px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shrink-0">
+                    HOME
+                  </span>
+                </div>
                 <span className="text-[10px] text-slate-400 block truncate">
                   {tournament.group_format === 'TWO_GROUPS' ? (p1?.group_name || 'Group Stage') : 'League Stage'}
                 </span>
@@ -98,7 +103,7 @@ export const MatchCard: React.FC<MatchCardProps> = ({ match, onSelect, onEnterSc
             )}
           </div>
 
-          {/* Row 2: Player 2 */}
+          {/* Row 2: Player 2 (Away) */}
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5 min-w-0 flex-1">
               <PlayerAvatar
@@ -108,9 +113,14 @@ export const MatchCard: React.FC<MatchCardProps> = ({ match, onSelect, onEnterSc
                 glow={match.winner_id === match.player_2}
               />
               <div className="min-w-0 flex-1">
-                <h4 className={`text-sm font-bold truncate ${match.winner_id === match.player_2 ? 'text-cyan-300 font-black' : 'text-white'}`}>
-                  {p2Name}
-                </h4>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <h4 className={`text-sm font-bold truncate ${match.winner_id === match.player_2 ? 'text-cyan-300 font-black' : 'text-white'}`}>
+                    {p2Name}
+                  </h4>
+                  <span className="text-[8px] font-mono font-black uppercase px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 shrink-0">
+                    AWAY
+                  </span>
+                </div>
                 <span className="text-[10px] text-slate-400 block truncate">
                   {tournament.group_format === 'TWO_GROUPS' ? (p2?.group_name || 'Group Stage') : 'League Stage'}
                 </span>
@@ -133,7 +143,7 @@ export const MatchCard: React.FC<MatchCardProps> = ({ match, onSelect, onEnterSc
 
         {/* Desktop View (sm+): Exact 5-column grid layout */}
         <div className="hidden sm:grid sm:grid-cols-5 items-center py-2">
-          {/* Player 1 */}
+          {/* Player 1 (Home) */}
           <div className="col-span-2 flex items-center gap-3">
             <PlayerAvatar
               name={p1Name}
@@ -142,9 +152,14 @@ export const MatchCard: React.FC<MatchCardProps> = ({ match, onSelect, onEnterSc
               glow={match.winner_id === match.player_1}
             />
             <div className="min-w-0">
-              <h4 className={`text-xs sm:text-sm truncate ${match.winner_id === match.player_1 ? 'font-black text-cyan-300' : 'font-bold text-white'}`}>
-                {p1Name}
-              </h4>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <h4 className={`text-xs sm:text-sm truncate ${match.winner_id === match.player_1 ? 'font-black text-cyan-300' : 'font-bold text-white'}`}>
+                  {p1Name}
+                </h4>
+                <span className="text-[8px] font-mono font-black uppercase px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shrink-0">
+                  HOME
+                </span>
+              </div>
               <span className="text-[10px] text-slate-400 truncate block">
                 {tournament.group_format === 'TWO_GROUPS' ? (p1?.group_name || 'Group Stage') : 'League Stage'}
               </span>
@@ -173,12 +188,17 @@ export const MatchCard: React.FC<MatchCardProps> = ({ match, onSelect, onEnterSc
             )}
           </div>
 
-          {/* Player 2 */}
+          {/* Player 2 (Away) */}
           <div className="col-span-2 flex items-center justify-end gap-3 text-right">
             <div className="min-w-0">
-              <h4 className={`text-xs sm:text-sm truncate ${match.winner_id === match.player_2 ? 'font-black text-cyan-300' : 'font-bold text-white'}`}>
-                {p2Name}
-              </h4>
+              <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                <span className="text-[8px] font-mono font-black uppercase px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 shrink-0">
+                  AWAY
+                </span>
+                <h4 className={`text-xs sm:text-sm truncate ${match.winner_id === match.player_2 ? 'font-black text-cyan-300' : 'font-bold text-white'}`}>
+                  {p2Name}
+                </h4>
+              </div>
               <span className="text-[10px] text-slate-400 truncate block">
                 {tournament.group_format === 'TWO_GROUPS' ? (p2?.group_name || 'Group Stage') : 'League Stage'}
               </span>

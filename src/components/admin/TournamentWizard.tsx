@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useTournament } from '../../context/TournamentContext';
-import { Tournament, Player, GroupFormat, QualificationMethod, MasterPlayer } from '../../types/tournament';
+import { Tournament, Player, GroupFormat, QualificationMethod, MasterPlayer, FixtureMode } from '../../types/tournament';
 import { PlayerAvatar } from '../common/PlayerAvatar';
 import { compressImage } from '../../services/storage';
 import { calculateTheoreticalMatches } from '../../services/fixtureGenerator';
@@ -56,6 +56,8 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
   const [lossPoints, setLossPoints] = useState(tournament.loss_points);
 
   const [groupFormat, setGroupFormat] = useState<GroupFormat>(tournament.group_format);
+  const [fixtureMode, setFixtureMode] = useState<FixtureMode>(tournament.fixture_mode || 'FREQUENCY');
+  const [matchesPerPlayer, setMatchesPerPlayer] = useState<number>(tournament.matches_per_player || 8);
   const [sameGroupFreq, setSameGroupFreq] = useState<number>(tournament.same_group_match_frequency);
   const [otherGroupFreq, setOtherGroupFreq] = useState<number>(tournament.other_group_match_frequency);
   const [qualMethod, setQualMethod] = useState<QualificationMethod>(tournament.qualification_method);
@@ -105,6 +107,8 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
       if (tournament.draw_points !== undefined) setDrawPoints(tournament.draw_points);
       if (tournament.loss_points !== undefined) setLossPoints(tournament.loss_points);
       if (tournament.group_format) setGroupFormat(tournament.group_format);
+      if (tournament.fixture_mode) setFixtureMode(tournament.fixture_mode);
+      if (tournament.matches_per_player !== undefined) setMatchesPerPlayer(tournament.matches_per_player);
       if (tournament.same_group_match_frequency !== undefined) setSameGroupFreq(tournament.same_group_match_frequency);
       if (tournament.other_group_match_frequency !== undefined) setOtherGroupFreq(tournament.other_group_match_frequency);
       if (tournament.qualification_method) setQualMethod(tournament.qualification_method);
@@ -131,6 +135,8 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
       const tourUpdates: Partial<Tournament> = {
         tournament_name: tournamentName.trim() || tournament.tournament_name,
         group_format: groupFormat,
+        fixture_mode: fixtureMode,
+        matches_per_player: matchesPerPlayer,
         win_points: winPoints,
         draw_points: drawPoints,
         loss_points: lossPoints,
@@ -151,6 +157,8 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
     wizardPlayers,
     tournamentName,
     groupFormat,
+    fixtureMode,
+    matchesPerPlayer,
     winPoints,
     drawPoints,
     lossPoints,
@@ -205,13 +213,15 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
   // Step 4 Frequency Save handler
   const handleSaveStep4 = () => {
     updateTournament({
+      fixture_mode: fixtureMode,
+      matches_per_player: matchesPerPlayer,
       same_group_match_frequency: sameGroupFreq,
       other_group_match_frequency: otherGroupFreq,
       qualification_method: qualMethod,
       custom_qualify_group_a: customA,
       custom_qualify_group_b: customB,
     });
-    setStatusAlert({ type: 'success', text: 'Match frequency saved.' });
+    setStatusAlert({ type: 'success', text: 'Match frequency and quota saved.' });
     setTimeout(() => setStatusAlert(null), 2500);
   };
 
@@ -223,6 +233,8 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
     const updatedTour: Partial<Tournament> = {
       tournament_name: tournamentName.trim() || 'eFootball Championship 2026',
       group_format: groupFormat,
+      fixture_mode: fixtureMode,
+      matches_per_player: matchesPerPlayer,
       same_group_match_frequency: sameGroupFreq,
       other_group_match_frequency: otherGroupFreq,
       qualification_method: qualMethod,
@@ -420,7 +432,9 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
     sameGroupFreq,
     otherGroupFreq,
     groupACount,
-    groupBCount
+    groupBCount,
+    fixtureMode,
+    matchesPerPlayer
   );
 
   // Generation handler
@@ -432,6 +446,8 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
       ...tournament,
       tournament_name: tournamentName.trim() || tournament.tournament_name || 'eFootball Championship 2026',
       group_format: groupFormat,
+      fixture_mode: fixtureMode,
+      matches_per_player: matchesPerPlayer,
       same_group_match_frequency: sameGroupFreq,
       other_group_match_frequency: otherGroupFreq,
       qualification_method: qualMethod,
@@ -1113,32 +1129,113 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
         <div className="bg-white/95 backdrop-blur-md border border-white/80 rounded-3xl p-6 sm:p-8 shadow-md space-y-6 animate-in fade-in">
           <h3 className="font-display text-xl font-black text-slate-900">Step 4: Flexible Match Frequency Configuration</h3>
           <p className="text-xs text-slate-500 font-medium">
-            Define how many times opponents face each other. The system will calculate and preview the exact fixture numbers.
+            Define how many times opponents face each other or assign a fixed match quota per player.
           </p>
 
           {groupFormat === 'SINGLE' ? (
-            <div className="max-w-xl space-y-4">
+            <div className="max-w-2xl space-y-5">
+              {/* Fixture Mode Switcher */}
               <div>
                 <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-2">
-                  Matches Per Opponent (Single / Double / Custom Round Robin)
+                  League Scheduling Method
                 </label>
-                <div className="grid grid-cols-4 gap-2">
-                  {[1, 2, 3, 4].map((freq) => (
-                    <button
-                      key={freq}
-                      type="button"
-                      onClick={() => setSameGroupFreq(freq)}
-                      className={`py-3 rounded-xl border font-display font-bold text-sm transition-all ${
-                        sameGroupFreq === freq
-                          ? 'bg-[#1d6bf3] text-white border-[#1d6bf3] shadow-md'
-                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                      }`}
-                    >
-                      {freq === 1 ? '1 Match (Single)' : freq === 2 ? '2 Matches (Double)' : `${freq} Matches`}
-                    </button>
-                  ))}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div
+                    onClick={() => setFixtureMode('FREQUENCY')}
+                    className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                      fixtureMode === 'FREQUENCY'
+                        ? 'border-[#1d6bf3] bg-blue-50/70 shadow-xs'
+                        : 'border-slate-200 bg-slate-50/70 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <h4 className="font-bold text-slate-900 text-sm">Round Robin Cycles</h4>
+                      <div className={`w-3.5 h-3.5 rounded-full border-2 ${fixtureMode === 'FREQUENCY' ? 'bg-[#1d6bf3] border-[#1d6bf3]' : 'border-slate-300'}`} />
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      Standard single, double, or custom round-robin multipliers.
+                    </p>
+                  </div>
+
+                  <div
+                    onClick={() => setFixtureMode('MATCH_COUNT')}
+                    className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                      fixtureMode === 'MATCH_COUNT'
+                        ? 'border-[#1d6bf3] bg-blue-50/70 shadow-xs'
+                        : 'border-slate-200 bg-slate-50/70 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <h4 className="font-bold text-slate-900 text-sm">Fixed Matches / Player (N)</h4>
+                      <div className={`w-3.5 h-3.5 rounded-full border-2 ${fixtureMode === 'MATCH_COUNT' ? 'bg-[#1d6bf3] border-[#1d6bf3]' : 'border-slate-300'}`} />
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      Guarantees exactly N matches per player with balanced Home & Away.
+                    </p>
+                  </div>
                 </div>
               </div>
+
+              {fixtureMode === 'MATCH_COUNT' ? (
+                <div className="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-4">
+                  <div>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-2">
+                      <label htmlFor="wizard-matches-per-player-input" className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        Each player plays N matches (Home/Away auto-balanced)
+                      </label>
+                      <span className="text-xs font-mono font-bold text-[#1d6bf3] bg-blue-100/80 px-2.5 py-1 rounded-lg border border-blue-200">
+                        → {Math.ceil(matchesPerPlayer / 2)} Home, {Math.floor(matchesPerPlayer / 2)} Away per player
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <input
+                        id="wizard-matches-per-player-input"
+                        type="number"
+                        min={1}
+                        max={50}
+                        value={matchesPerPlayer}
+                        onChange={(e) => setMatchesPerPlayer(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="w-32 px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 font-mono font-bold text-base focus:outline-none focus:ring-2 focus:ring-[#1d6bf3]/30 focus:border-[#1d6bf3]"
+                      />
+                      <span className="text-xs text-slate-500">
+                        Opponents are randomized with minimal repeated pairings.
+                      </span>
+                    </div>
+                  </div>
+
+                  {wizardPlayers.length > 0 && (wizardPlayers.length * matchesPerPlayer) % 2 !== 0 && (
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs flex items-center gap-2 font-medium">
+                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>
+                        Note: For an odd roster ({wizardPlayers.length} players), please pick an even match count so each match has 2 players.
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-2">
+                    Matches Per Opponent (Single / Double / Custom Round Robin)
+                  </label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[1, 2, 3, 4].map((freq) => (
+                      <button
+                        key={freq}
+                        type="button"
+                        onClick={() => setSameGroupFreq(freq)}
+                        className={`py-3 rounded-xl border font-display font-bold text-sm transition-all ${
+                          sameGroupFreq === freq
+                            ? 'bg-[#1d6bf3] text-white border-[#1d6bf3] shadow-md'
+                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {freq === 1 ? '1 Match (Single)' : freq === 2 ? '2 Matches (Double)' : `${freq} Matches`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -1187,7 +1284,7 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
                 <span className="text-[10px] text-slate-500 block font-mono font-bold">Matches / Player</span>
                 <span className="text-xl font-display font-bold text-slate-900">
                   {groupFormat === 'SINGLE' 
-                    ? (wizardPlayers.length - 1) * sameGroupFreq 
+                    ? (fixtureMode === 'MATCH_COUNT' ? matchesPerPlayer : (wizardPlayers.length - 1) * sameGroupFreq)
                     : `${(Math.max(0, groupACount - 1)) * sameGroupFreq + (groupBCount * otherGroupFreq)} (avg)`}
                 </span>
               </div>
@@ -1254,14 +1351,29 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onOpenResetM
 
             <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2 text-xs">
               <span className="text-[10px] text-slate-500 uppercase font-mono font-bold block">Match Schedule Math</span>
-              <div className="flex justify-between py-1 border-b border-slate-200">
-                <span className="text-slate-500">Same Group Freq:</span>
-                <span className="font-bold text-slate-900">{sameGroupFreq}x</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-200">
-                <span className="text-slate-500">Cross Group Freq:</span>
-                <span className="font-bold text-slate-900">{otherGroupFreq}x</span>
-              </div>
+              {groupFormat === 'SINGLE' && fixtureMode === 'MATCH_COUNT' ? (
+                <>
+                  <div className="flex justify-between py-1 border-b border-slate-200">
+                    <span className="text-slate-500">Match Mode:</span>
+                    <span className="font-bold text-blue-600">Fixed Match Quota ({matchesPerPlayer}/player)</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-200">
+                    <span className="text-slate-500">Home / Away Split:</span>
+                    <span className="font-bold text-slate-900">{Math.ceil(matchesPerPlayer / 2)} Home, {Math.floor(matchesPerPlayer / 2)} Away</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between py-1 border-b border-slate-200">
+                    <span className="text-slate-500">Same Group Freq:</span>
+                    <span className="font-bold text-slate-900">{sameGroupFreq}x</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-200">
+                    <span className="text-slate-500">Cross Group Freq:</span>
+                    <span className="font-bold text-slate-900">{otherGroupFreq}x</span>
+                  </div>
+                </>
+              )}
               <div className="flex justify-between py-1">
                 <span className="text-slate-500">Total Fixtures to Generate:</span>
                 <span className="font-bold text-amber-600 text-sm">{matchMath.total} Matches</span>
